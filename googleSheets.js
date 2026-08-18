@@ -1,0 +1,749 @@
+if (require('module').globalPaths) {
+  require('module').globalPaths.push('C:/Users/buith/AppData/Local/Temp/qlcv_deps/node_modules');
+}
+module.paths.push('C:/Users/buith/AppData/Local/Temp/qlcv_deps/node_modules');
+
+const { google } = require('googleapis');
+const path = require('path');
+const fs = require('fs');
+
+// Cấu hình Service Account & Sheet Cache
+const KEY_FILE = process.env.GOOGLE_APPLICATION_CREDENTIALS || path.join(__dirname, 'qlcv-505501-c6ad069851e0.json');
+const SERVICE_ACCOUNT_EMAIL = 'qlcv-417@qlcv-505501.iam.gserviceaccount.com';
+
+const auth = new google.auth.GoogleAuth({
+  keyFile: KEY_FILE,
+  scopes: ['https://www.googleapis.com/auth/spreadsheets']
+});
+
+const sheets = google.sheets({ version: 'v4', auth });
+
+// Bộ nhớ đệm tạm thời (Memory Store Fallback nếu chưa kết nối thành công Sheet ID)
+let inMemoryData = null;
+
+// Khởi tạo bộ nhớ tạm thời từ tệp js/data.js
+function loadInitialInMemoryData() {
+  if (inMemoryData) return inMemoryData;
+  try {
+    const dataJsPath = path.join(__dirname, 'js', 'data.js');
+    if (fs.existsSync(dataJsPath)) {
+      const dataJsContent = fs.readFileSync(dataJsPath, 'utf8');
+      
+      let tasks = [];
+      let users = [];
+
+      const tasksMatch = dataJsContent.match(/window\.INITIAL_TASKS\s*=\s*(\[[\s\S]*?\]);/);
+      if (tasksMatch) {
+        tasks = JSON.parse(tasksMatch[1]);
+      }
+
+      const usersMatch = dataJsContent.match(/window\.INITIAL_USERS\s*=\s*(\[[\s\S]*?\]);/);
+      if (usersMatch) {
+        users = JSON.parse(usersMatch[1]);
+      }
+
+      inMemoryData = {
+        tasks: tasks.map((t, idx) => ({ ...t, id: idx + 1, excel_row: idx + 4 })),
+        employees: [
+          { ma_nv: 'NV001', ho_ten: 'Phạm Duy Thảo', phong_ban: 'Kinh tế', chuc_vu: 'Chuyên viên', trang_thai: 'Đang làm việc', ghi_chu: 'Đang làm việc' },
+          { ma_nv: 'NV002', ho_ten: 'Cao Trần Quang', phong_ban: 'Kinh tế', chuc_vu: 'Chuyên viên', trang_thai: 'Đang làm việc', ghi_chu: 'Đang làm việc' },
+          { ma_nv: 'NV003', ho_ten: 'Đặng Hoàng Đa', phong_ban: 'Kinh tế', chuc_vu: 'Chuyên viên', trang_thai: 'Đang làm việc', ghi_chu: 'Đang làm việc' }
+        ],
+        categories: {
+          departments: ['Kinh tế', 'VH - XH', 'Đô thị'],
+          agencies: ['Sở Tài Chính', 'Sở Xây dựng', 'Sở Nông nghiệp và PTNT'],
+          empStatuses: ['Đang làm việc', 'Tạm nghỉ', 'Nghỉ việc']
+        },
+        users: users,
+        fileStatus: {
+          lastModified: new Date().toISOString(),
+          ticks: Date.now(),
+          size: 2048,
+          mode: 'in-memory-fallback'
+        }
+      };
+      return inMemoryData;
+    }
+  } catch (err) {
+    console.warn('Lỗi đọc dữ liệu mẫu:', err.message);
+  }
+
+  inMemoryData = {
+    tasks: [],
+    employees: [],
+    categories: { departments: ['Kinh tế', 'VH - XH'], agencies: [], empStatuses: ['Đang làm việc', 'Tạm nghỉ', 'Nghỉ việc'] },
+    users: [],
+    fileStatus: { lastModified: new Date().toISOString(), ticks: Date.now(), size: 1024 }
+  };
+  return inMemoryData;
+}
+
+// Chuẩn hóa trạng thái công chức
+function normalizeEmpStatus(rawStatus) {
+  if (!rawStatus) return 'Đang làm việc';
+  const clean = String(rawStatus).trim();
+  if (clean === 'Kích hoạt' || clean.toLowerCase() === 'kich hoat') return 'Đang làm việc';
+  const lower = clean.toLowerCase();
+  if (clean.startsWith('T') || clean.startsWith('t') || lower.includes('tạm') || lower.includes('tam')) {
+    return 'Tạm nghỉ';
+  }
+  if (clean.startsWith('N') || clean.startsWith('n') || lower.includes('nghỉ') || lower.includes('nghi') || lower.includes('chuyển')) {
+    return 'Nghỉ việc';
+  }
+  return 'Đang làm việc';
+}
+
+// Đọc Google Sheet ID từ .env hoặc biến môi trường
+function getSpreadsheetId() {
+  const envId = process.env.GOOGLE_SHEET_ID || '';
+  if (envId && envId.trim() !== '') {
+    return envId.trim();
+  }
+  return '';
+}
+
+// Đảm bảo tiêu đề các tab sheet tồn tại
+async function ensureSheetTabs(spreadsheetId) {
+  try {
+    const meta = await sheets.spreadsheets.get({ spreadsheetId });
+    const existingTitles = (meta.data.sheets || []).map(s => s.properties.title);
+
+    const requiredTabs = ['Tasks', 'Employees', 'Settings'];
+    const addRequests = [];
+
+    for (const tab of requiredTabs) {
+      if (!existingTitles.includes(tab)) {
+        addRequests.push({
+          addSheet: { properties: { title: tab } }
+        });
+      }
+    }
+
+    if (addRequests.length > 0) {
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: { requests: addRequests }
+      });
+      await initializeDefaultHeadersAndSeed(spreadsheetId);
+    }
+  } catch (err) {
+    if (err.message && err.message.includes('permission')) {
+      throw new Error(`Service Account chưa được cấp quyền Editor cho Google Sheet ID: ${spreadsheetId}. Vui lòng bấm "Chia sẻ" (Share) trên Google Sheets và thêm email: ${SERVICE_ACCOUNT_EMAIL}`);
+    }
+    throw err;
+  }
+}
+
+// Nạp dữ liệu mẫu ban đầu vào Google Sheet mới tạo
+async function initializeDefaultHeadersAndSeed(spreadsheetId) {
+  const memData = loadInitialInMemoryData();
+
+  const taskRows = [
+    ['Nơi ban hành', 'Số công văn', 'Tên công việc', 'Mô tả', 'Phòng ban', 'Người phụ trách', 'Ngày tạo', 'Deadline', 'Ngày hoàn thành', 'Trạng thái', 'Kết quả', 'Ghi chú', 'Số ngày còn lại', 'Số ngày trễ', 'Đánh giá']
+  ];
+
+  (memData.tasks || []).forEach(t => {
+    taskRows.push([
+      t.noi_ban_hanh || '', t.so_cong_van || '', t.ten_cong_viec || '', t.mo_ta || '',
+      t.phong_ban || '', t.nguoi_phu_trach || '', t.ngay_tao || '', t.deadline || '',
+      t.ngay_hoan_thanh || '', t.trang_thai || '', t.ket_qua || '', t.ghi_chu || '',
+      t.so_ngay_con_lai || '', t.so_ngay_tre || '', t.danh_gia || ''
+    ]);
+  });
+
+  const empRows = [['Mã NV', 'Họ tên', 'Phòng ban', 'Chức vụ', 'Trạng thái']];
+  (memData.employees || []).forEach(e => {
+    empRows.push([e.ma_nv, e.ho_ten, e.phong_ban, e.chuc_vu, e.trang_thai]);
+  });
+
+  const setHeader = ['Phòng ban', '', '', '', 'Trạng thái NV', '', 'Nơi ban hành', '', '', '', 'Username', 'Password', 'Department', 'Role', 'Name'];
+  const setRows = [setHeader];
+
+  const maxLen = Math.max(
+    memData.categories.departments.length,
+    memData.categories.empStatuses.length,
+    memData.categories.agencies.length,
+    memData.users.length
+  );
+
+  for (let i = 0; i < maxLen; i++) {
+    const dept = memData.categories.departments[i] || '';
+    const empSt = memData.categories.empStatuses[i] || '';
+    const agency = memData.categories.agencies[i] || '';
+    const u = memData.users[i];
+
+    setRows.push([
+      dept, '', '', '', empSt, '', agency, '', '', '',
+      u ? u.username : '', u ? u.password : '', u ? u.department : '', u ? u.role : '', u ? u.name : ''
+    ]);
+  }
+
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      valueInputOption: 'USER_ENTERED',
+      data: [
+        { range: 'Tasks!A3:O' + (taskRows.length + 2), values: taskRows },
+        { range: 'Employees!A3:E' + (empRows.length + 2), values: empRows },
+        { range: 'Settings!A3:O' + (setRows.length + 2), values: setRows }
+      ]
+    }
+  });
+}
+
+// ----------------------------------------------------------------------
+// GET DATA (ĐỌC DỮ LIỆU TỪ GOOGLE SHEETS)
+// ----------------------------------------------------------------------
+async function getData() {
+  const spreadsheetId = getSpreadsheetId();
+
+  if (!spreadsheetId) {
+    console.log('[Google Sheets API] Chưa cấu hình GOOGLE_SHEET_ID trong .env. Sử dụng dữ liệu bộ nhớ.');
+    return loadInitialInMemoryData();
+  }
+
+  try {
+    await ensureSheetTabs(spreadsheetId);
+
+    const res = await sheets.spreadsheets.values.batchGet({
+      spreadsheetId,
+      ranges: ['Tasks!A1:O500', 'Employees!A1:E500', 'Settings!A1:O500']
+    });
+
+    const valueRanges = res.data.valueRanges || [];
+    const tasksRows = valueRanges[0]?.values || [];
+    const empRows = valueRanges[1]?.values || [];
+    const setRows = valueRanges[2]?.values || [];
+
+    // Nếu Sheet trống, tự động nạp dữ liệu mẫu ban đầu
+    if (tasksRows.length <= 3 && empRows.length <= 3) {
+      console.log(`[Google Sheets API] Sheet ID ${spreadsheetId} chưa có dữ liệu. Đang tự động nạp dữ liệu ban đầu...`);
+      await initializeDefaultHeadersAndSeed(spreadsheetId);
+      return getData();
+    }
+
+    // 1. Parse Tasks (Hàng dữ liệu bắt đầu từ Row 4)
+    const tasks = [];
+    let taskIdCounter = 1;
+    for (let r = 3; r < tasksRows.length; r++) {
+      const row = tasksRows[r] || [];
+      const noi_ban_hanh = row[0] || '';
+      const so_cong_van = row[1] || '';
+      const ten_cong_viec = row[2] || '';
+
+      if (!so_cong_van && !ten_cong_viec) continue;
+
+      tasks.push({
+        id: taskIdCounter++,
+        excel_row: r + 1,
+        noi_ban_hanh: String(noi_ban_hanh),
+        so_cong_van: String(so_cong_van),
+        ten_cong_viec: String(ten_cong_viec),
+        mo_ta: String(row[3] || ''),
+        phong_ban: String(row[4] || ''),
+        nguoi_phu_trach: String(row[5] || ''),
+        ngay_tao: String(row[6] || ''),
+        deadline: String(row[7] || ''),
+        ngay_hoan_thanh: String(row[8] || ''),
+        trang_thai: String(row[9] || ''),
+        ket_qua: String(row[10] || ''),
+        ghi_chu: String(row[11] || ''),
+        so_ngay_con_lai: String(row[12] || ''),
+        so_ngay_tre: String(row[13] || ''),
+        danh_gia: String(row[14] || '')
+      });
+    }
+
+    // 2. Parse Employees
+    const employees = [];
+    for (let r = 3; r < empRows.length; r++) {
+      const row = empRows[r] || [];
+      const ma_nv = String(row[0] || '').trim();
+      const ho_ten = String(row[1] || '').trim();
+
+      if (!ma_nv && !ho_ten) continue;
+
+      const rawStatus = row[4] || '';
+      const cleanStatus = normalizeEmpStatus(rawStatus);
+
+      employees.push({
+        ma_nv,
+        ho_ten,
+        phong_ban: String(row[2] || ''),
+        chuc_vu: String(row[3] || ''),
+        trang_thai: cleanStatus,
+        ghi_chu: cleanStatus
+      });
+    }
+
+    // 3. Parse Settings
+    const departments = [];
+    for (let r = 3; r < Math.min(6, setRows.length); r++) {
+      const val = String(setRows[r]?.[0] || '').trim();
+      if (val) departments.push(val);
+    }
+
+    const agencies = [];
+    for (let r = 3; r < setRows.length; r++) {
+      const val = String(setRows[r]?.[6] || '').trim();
+      if (val) agencies.push(val);
+    }
+
+    const empStatuses = [];
+    for (let r = 3; r < setRows.length; r++) {
+      const val = String(setRows[r]?.[4] || '').trim();
+      if (val) empStatuses.push(val);
+    }
+    if (empStatuses.length === 0) {
+      empStatuses.push('Đang làm việc', 'Tạm nghỉ', 'Nghỉ việc');
+    }
+
+    const users = [];
+    for (let r = 3; r < setRows.length; r++) {
+      const u_name = String(setRows[r]?.[10] || '').trim();
+      if (u_name) {
+        users.push({
+          username: u_name,
+          password: String(setRows[r]?.[11] || ''),
+          department: String(setRows[r]?.[12] || ''),
+          role: String(setRows[r]?.[13] || ''),
+          name: String(setRows[r]?.[14] || '')
+        });
+      }
+    }
+
+    return {
+      tasks,
+      employees,
+      categories: { departments, agencies, empStatuses },
+      users,
+      fileStatus: {
+        lastModified: new Date().toISOString(),
+        ticks: Date.now(),
+        size: 2048,
+        spreadsheetId
+      }
+    };
+  } catch (err) {
+    console.error('[Google Sheets API Lỗi]:', err.message);
+    const memData = loadInitialInMemoryData();
+    memData.fileStatus.warning = err.message;
+    return memData;
+  }
+}
+
+// ----------------------------------------------------------------------
+// ADD ITEM
+// ----------------------------------------------------------------------
+async function addItem(type, data) {
+  const spreadsheetId = getSpreadsheetId();
+
+  if (!spreadsheetId) {
+    const memData = loadInitialInMemoryData();
+    if (type === 'agencies') {
+      const name = String(typeof data === 'object' ? data.name : data).trim();
+      if (name) memData.categories.agencies.push(name);
+    } else if (type === 'employees') {
+      memData.employees.push({ ...data, trang_thai: normalizeEmpStatus(data.trang_thai) });
+    } else if (type === 'users') {
+      memData.users.push(data);
+    } else {
+      memData.tasks.push({ ...data, id: memData.tasks.length + 1 });
+    }
+    return { success: true, message: 'Added item (in-memory)' };
+  }
+
+  const currentData = await getData();
+
+  if (type === 'agencies') {
+    let agencyName = typeof data === 'object' ? (data.name || data.noi_ban_hanh || '') : String(data);
+    agencyName = String(agencyName).trim();
+    if (!agencyName) throw new Error('Tên Nơi ban hành không được để rỗng.');
+
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Settings!G4:G200' });
+    const existing = res.data.values || [];
+    const targetRow = existing.length + 4;
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `Settings!G${targetRow}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [[agencyName]] }
+    });
+
+    return { success: true, name: agencyName, excel_row: targetRow, message: 'Added agency successfully' };
+  }
+
+  if (type === 'employees') {
+    let maxNum = 0;
+    (currentData.employees || []).forEach(emp => {
+      const match = String(emp.ma_nv).match(/\d+/);
+      if (match) {
+        const num = parseInt(match[0], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    });
+
+    const nextMaNV = `NV${String(maxNum + 1).padStart(3, '0')}`;
+    const ma_nv = data.ma_nv && String(data.ma_nv).trim() ? String(data.ma_nv).trim() : nextMaNV;
+    const ho_ten = String(data.ho_ten || '').trim();
+    const phong_ban = String(data.phong_ban || '').trim();
+    const chuc_vu = String(data.chuc_vu || '').trim();
+    const cleanSt = normalizeEmpStatus(data.trang_thai || data.ghi_chu);
+
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Employees!A4:A500' });
+    const existing = res.data.values || [];
+    const targetRow = existing.length + 4;
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `Employees!A${targetRow}:E${targetRow}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [[ma_nv, ho_ten, phong_ban, chuc_vu, cleanSt]] }
+    });
+
+    return { success: true, ma_nv, excel_row: targetRow, message: 'Added employee successfully' };
+  }
+
+  if (type === 'users') {
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Settings!K4:K200' });
+    const existing = res.data.values || [];
+    const targetRow = existing.length + 4;
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `Settings!K${targetRow}:O${targetRow}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [[
+          String(data.username || ''), String(data.password || ''),
+          String(data.department || ''), String(data.role || ''), String(data.name || '')
+        ]]
+      }
+    });
+
+    return { success: true, username: data.username, message: 'Added user successfully' };
+  }
+
+  // Default: Tasks
+  const statusVal = data.trang_thai || 'Đang thực hiện';
+  const ratingVal = data.danh_gia || '--';
+
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Tasks!A4:A500' });
+  const existing = res.data.values || [];
+  const targetRow = existing.length + 4;
+
+  const newRowValues = [
+    String(data.noi_ban_hanh || ''), String(data.so_cong_van || ''), String(data.ten_cong_viec || ''),
+    String(data.mo_ta || ''), String(data.phong_ban || ''), String(data.nguoi_phu_trach || ''),
+    String(data.ngay_tao || ''), String(data.deadline || ''), String(data.ngay_hoan_thanh || ''),
+    String(statusVal), String(data.ket_qua || ''), String(data.ghi_chu || ''),
+    '', '', String(ratingVal)
+  ];
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `Tasks!A${targetRow}:O${targetRow}`,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: { values: [newRowValues] }
+  });
+
+  return { success: true, id: targetRow - 3, excel_row: targetRow, message: 'Added task successfully' };
+}
+
+// ----------------------------------------------------------------------
+// UPDATE ITEM
+// ----------------------------------------------------------------------
+async function updateItem(type, data) {
+  if (!data) throw new Error('Dữ liệu cập nhật không hợp lệ.');
+  const spreadsheetId = getSpreadsheetId();
+
+  if (!spreadsheetId) {
+    const memData = loadInitialInMemoryData();
+    if (type === 'employees') {
+      const idx = memData.employees.findIndex(e => e.ma_nv === data.ma_nv);
+      if (idx !== -1) memData.employees[idx] = { ...memData.employees[idx], ...data };
+    } else if (type === 'tasks') {
+      const idx = memData.tasks.findIndex(t => t.id === data.id);
+      if (idx !== -1) memData.tasks[idx] = { ...memData.tasks[idx], ...data };
+    }
+    return { success: true, message: 'Updated item (in-memory)' };
+  }
+
+  if (type === 'agencies') {
+    const oldName = String(data.oldName || data.name || '').trim();
+    const newName = String(data.newName || '').trim();
+
+    if (oldName && newName) {
+      const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Settings!G4:G200' });
+      const rows = res.data.values || [];
+      for (let i = 0; i < rows.length; i++) {
+        if (String(rows[i][0] || '').trim() === oldName) {
+          const rowNum = i + 4;
+          await sheets.spreadsheets.values.update({
+            spreadsheetId,
+            range: `Settings!G${rowNum}`,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: { values: [[newName]] }
+          });
+          break;
+        }
+      }
+    }
+    return { success: true, oldName, newName, message: 'Updated agency successfully' };
+  }
+
+  if (type === 'employees') {
+    const targetMaNV = String(data.ma_nv || data.id || '').trim();
+    if (!targetMaNV) throw new Error('Thiếu Mã NV để cập nhật.');
+
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Employees!A4:E500' });
+    const rows = res.data.values || [];
+    let targetRow = 0;
+
+    for (let i = 0; i < rows.length; i++) {
+      if (String(rows[i][0] || '').trim().toLowerCase() === targetMaNV.toLowerCase()) {
+        targetRow = i + 4;
+        break;
+      }
+    }
+
+    if (!targetRow) throw new Error(`Không tìm thấy công chức Mã NV '${targetMaNV}' để cập nhật!`);
+
+    const cur = rows[targetRow - 4] || [];
+    const ho_ten = data.ho_ten !== undefined ? String(data.ho_ten).trim() : (cur[1] || '');
+    const phong_ban = data.phong_ban !== undefined ? String(data.phong_ban).trim() : (cur[2] || '');
+    const chuc_vu = data.chuc_vu !== undefined ? String(data.chuc_vu).trim() : (cur[3] || '');
+    const cleanSt = normalizeEmpStatus(data.trang_thai !== undefined ? data.trang_thai : (data.ghi_chu !== undefined ? data.ghi_chu : cur[4]));
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `Employees!A${targetRow}:E${targetRow}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [[targetMaNV, ho_ten, phong_ban, chuc_vu, cleanSt]] }
+    });
+
+    return { success: true, ma_nv: targetMaNV, excel_row: targetRow, message: 'Updated employee successfully' };
+  }
+
+  if (type === 'users') {
+    const targetUser = String(data.username || '').trim();
+    if (targetUser) {
+      const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Settings!K4:O200' });
+      const rows = res.data.values || [];
+      for (let i = 0; i < rows.length; i++) {
+        if (String(rows[i][0] || '').trim() === targetUser) {
+          const targetRow = i + 4;
+          const cur = rows[i] || [];
+          await sheets.spreadsheets.values.update({
+            spreadsheetId,
+            range: `Settings!K${targetRow}:O${targetRow}`,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: {
+              values: [[
+                targetUser,
+                data.password !== undefined ? String(data.password) : (cur[1] || ''),
+                data.department !== undefined ? String(data.department) : (cur[2] || ''),
+                data.role !== undefined ? String(data.role) : (cur[3] || ''),
+                data.name !== undefined ? String(data.name) : (cur[4] || '')
+              ]]
+            }
+          });
+          break;
+        }
+      }
+    }
+    return { success: true, username: data.username, message: 'Updated user successfully' };
+  }
+
+  // Default: Tasks
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Tasks!A4:O500' });
+  const rows = res.data.values || [];
+  let targetRow = 0;
+
+  if (data.excel_row && parseInt(data.excel_row, 10) >= 4) {
+    targetRow = parseInt(data.excel_row, 10);
+  }
+
+  const cleanSoCV = String(data.so_cong_van || '').trim();
+  if (!targetRow && cleanSoCV) {
+    for (let i = 0; i < rows.length; i++) {
+      if (String(rows[i][1] || '').trim() === cleanSoCV) {
+        targetRow = i + 4;
+        break;
+      }
+    }
+  }
+
+  if (!targetRow && data.id) {
+    const reqId = parseInt(data.id, 10);
+    let currentId = 1;
+    for (let i = 0; i < rows.length; i++) {
+      const soCV = String(rows[i][1] || '').trim();
+      const tenCV = String(rows[i][2] || '').trim();
+      if (!soCV && !tenCV) continue;
+      if (currentId === reqId) {
+        targetRow = i + 4;
+        break;
+      }
+      currentId++;
+    }
+  }
+
+  if (!targetRow && data.id) {
+    targetRow = parseInt(data.id, 10) + 3;
+  }
+
+  if (targetRow >= 4) {
+    const cur = rows[targetRow - 4] || [];
+    const updatedRow = [
+      data.noi_ban_hanh !== undefined ? String(data.noi_ban_hanh) : (cur[0] || ''),
+      data.so_cong_van !== undefined ? String(data.so_cong_van) : (cur[1] || ''),
+      data.ten_cong_viec !== undefined ? String(data.ten_cong_viec) : (cur[2] || ''),
+      data.mo_ta !== undefined ? String(data.mo_ta) : (cur[3] || ''),
+      data.phong_ban !== undefined ? String(data.phong_ban) : (cur[4] || ''),
+      data.nguoi_phu_trach !== undefined ? String(data.nguoi_phu_trach) : (cur[5] || ''),
+      data.ngay_tao !== undefined ? String(data.ngay_tao) : (cur[6] || ''),
+      data.deadline !== undefined ? String(data.deadline) : (cur[7] || ''),
+      data.ngay_hoan_thanh !== undefined ? String(data.ngay_hoan_thanh) : (cur[8] || ''),
+      data.trang_thai !== undefined ? String(data.trang_thai) : (cur[9] || ''),
+      data.ket_qua !== undefined ? String(data.ket_qua) : (cur[10] || ''),
+      data.ghi_chu !== undefined ? String(data.ghi_chu) : (cur[11] || ''),
+      cur[12] || '', cur[13] || '',
+      data.danh_gia !== undefined && String(data.danh_gia) !== '' ? String(data.danh_gia) : (cur[14] || '--')
+    ];
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `Tasks!A${targetRow}:O${targetRow}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [updatedRow] }
+    });
+  }
+
+  return { success: true, id: data.id, excel_row: targetRow, message: 'Updated task successfully' };
+}
+
+// ----------------------------------------------------------------------
+// DELETE ITEM
+// ----------------------------------------------------------------------
+async function deleteItem(type, id, data) {
+  const spreadsheetId = getSpreadsheetId();
+
+  if (!spreadsheetId) {
+    const memData = loadInitialInMemoryData();
+    if (type === 'employees') {
+      memData.employees = memData.employees.filter(e => e.ma_nv !== id);
+    } else if (type === 'tasks') {
+      memData.tasks = memData.tasks.filter(t => t.id !== parseInt(id, 10));
+    }
+    return { success: true, message: 'Deleted item (in-memory)' };
+  }
+
+  if (type === 'agencies') {
+    const targetName = String(data?.name || data?.oldName || id || '').trim();
+    if (targetName) {
+      const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Settings!G4:G200' });
+      const rows = res.data.values || [];
+      for (let i = 0; i < rows.length; i++) {
+        if (String(rows[i][0] || '').trim() === targetName) {
+          const rowNum = i + 4;
+          await sheets.spreadsheets.values.clear({ spreadsheetId, range: `Settings!G${rowNum}` });
+          break;
+        }
+      }
+    }
+    return { success: true, name: targetName, message: 'Deleted agency successfully' };
+  }
+
+  if (type === 'employees') {
+    const targetMaNV = String(data?.ma_nv || id || '').trim();
+    if (!targetMaNV) throw new Error('Thiếu Mã NV để xóa.');
+
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Employees!A4:E500' });
+    const rows = res.data.values || [];
+    let targetRow = 0;
+
+    for (let i = 0; i < rows.length; i++) {
+      if (String(rows[i][0] || '').trim().toLowerCase() === targetMaNV.toLowerCase()) {
+        targetRow = i + 4;
+        break;
+      }
+    }
+
+    if (!targetRow) throw new Error(`Không tìm thấy công chức Mã NV '${targetMaNV}' để xóa!`);
+
+    await sheets.spreadsheets.values.clear({ spreadsheetId, range: `Employees!A${targetRow}:E${targetRow}` });
+    return { success: true, ma_nv: targetMaNV, excel_row: targetRow, message: 'Deleted employee successfully' };
+  }
+
+  if (type === 'users') {
+    const targetUser = String(id || data?.username || '').trim();
+    if (targetUser) {
+      const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Settings!K4:O200' });
+      const rows = res.data.values || [];
+      for (let i = 0; i < rows.length; i++) {
+        if (String(rows[i][0] || '').trim() === targetUser) {
+          const targetRow = i + 4;
+          await sheets.spreadsheets.values.clear({ spreadsheetId, range: `Settings!K${targetRow}:O${targetRow}` });
+          break;
+        }
+      }
+    }
+    return { success: true, id, message: 'Deleted user successfully' };
+  }
+
+  // Default: Tasks
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Tasks!A4:O500' });
+  const rows = res.data.values || [];
+  let targetRow = 0;
+
+  if (data?.excel_row && parseInt(data.excel_row, 10) >= 4) {
+    targetRow = parseInt(data.excel_row, 10);
+  }
+
+  if (!targetRow && data?.so_cong_van) {
+    const cleanSoCV = String(data.so_cong_van).trim();
+    for (let i = 0; i < rows.length; i++) {
+      if (String(rows[i][1] || '').trim() === cleanSoCV) {
+        targetRow = i + 4;
+        break;
+      }
+    }
+  }
+
+  if (!targetRow && id) {
+    const targetId = parseInt(id, 10);
+    let currentId = 1;
+    for (let i = 0; i < rows.length; i++) {
+      const soCV = String(rows[i][1] || '').trim();
+      const tenCV = String(rows[i][2] || '').trim();
+      if (!soCV && !tenCV) continue;
+      if (currentId === targetId) {
+        targetRow = i + 4;
+        break;
+      }
+      currentId++;
+    }
+  }
+
+  if (!targetRow && id) {
+    targetRow = parseInt(id, 10) + 3;
+  }
+
+  if (targetRow >= 4) {
+    await sheets.spreadsheets.values.clear({ spreadsheetId, range: `Tasks!A${targetRow}:O${targetRow}` });
+  }
+
+  return { success: true, id, message: 'Deleted task successfully' };
+}
+
+module.exports = {
+  getData,
+  addItem,
+  updateItem,
+  deleteItem,
+  getSpreadsheetId,
+  normalizeEmpStatus,
+  SERVICE_ACCOUNT_EMAIL
+};
