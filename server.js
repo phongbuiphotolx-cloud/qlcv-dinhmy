@@ -1,7 +1,7 @@
-if (require('module').globalPaths) {
+if (require('module').globalPaths && require('fs').existsSync('C:/Users/buith/AppData/Local/Temp/qlcv_deps/node_modules')) {
   require('module').globalPaths.push('C:/Users/buith/AppData/Local/Temp/qlcv_deps/node_modules');
+  module.paths.push('C:/Users/buith/AppData/Local/Temp/qlcv_deps/node_modules');
 }
-module.paths.push('C:/Users/buith/AppData/Local/Temp/qlcv_deps/node_modules');
 
 require('dotenv').config();
 const express = require('express');
@@ -161,12 +161,17 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Start Server
-app.listen(PORT, () => {
-  console.log('==========================================================');
-  console.log(` QLCV UBND Node.js Backend & Web Server running on port ${PORT}`);
-  console.log(` Frontend: http://localhost:${PORT}/`);
-  console.log(` API Endpoints: http://localhost:${PORT}/api/data`);
-  console.log(` Database: Google Sheets API`);
-  console.log('==========================================================');
-});
+// Start Server (Chỉ lắng nghe cổng khi chạy ở môi trường Standalone / Local)
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log('==========================================================');
+    console.log(` QLCV UBND Node.js Backend & Web Server running on port ${PORT}`);
+    console.log(` Frontend: http://localhost:${PORT}/`);
+    console.log(` API Endpoints: http://localhost:${PORT}/api/data`);
+    console.log(` Database: Google Sheets API`);
+    console.log('==========================================================');
+  });
+}
+
+// Export app cho Vercel Serverless Function
+module.exports = app;

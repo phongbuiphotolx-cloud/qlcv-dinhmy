@@ -1,21 +1,34 @@
-if (require('module').globalPaths) {
+if (require('module').globalPaths && require('fs').existsSync('C:/Users/buith/AppData/Local/Temp/qlcv_deps/node_modules')) {
   require('module').globalPaths.push('C:/Users/buith/AppData/Local/Temp/qlcv_deps/node_modules');
+  module.paths.push('C:/Users/buith/AppData/Local/Temp/qlcv_deps/node_modules');
 }
-module.paths.push('C:/Users/buith/AppData/Local/Temp/qlcv_deps/node_modules');
 
 const { google } = require('googleapis');
 const path = require('path');
 const fs = require('fs');
 
-// Cấu hình Service Account & Sheet Cache
-const KEY_FILE = process.env.GOOGLE_APPLICATION_CREDENTIALS || path.join(__dirname, 'qlcv-505501-c6ad069851e0.json');
-const SERVICE_ACCOUNT_EMAIL = 'qlcv-417@qlcv-505501.iam.gserviceaccount.com';
+// Cấu hình Service Account cho Google Sheets API
+const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
+let privateKey = process.env.GOOGLE_PRIVATE_KEY;
 
-const auth = new google.auth.GoogleAuth({
-  keyFile: KEY_FILE,
+let authConfig = {
   scopes: ['https://www.googleapis.com/auth/spreadsheets']
-});
+};
 
+if (clientEmail && privateKey) {
+  // Ưu tiên sử dụng Biến Môi Trường (Vercel / Cloud Deployment)
+  privateKey = privateKey.replace(/\\n/g, '\n');
+  authConfig.credentials = {
+    client_email: clientEmail,
+    private_key: privateKey
+  };
+} else {
+  // Dùng JSON key file khi chạy ở môi trường Local Development
+  const KEY_FILE = process.env.GOOGLE_APPLICATION_CREDENTIALS || path.join(__dirname, 'qlcv-505501-c6ad069851e0.json');
+  authConfig.keyFile = KEY_FILE;
+}
+
+const auth = new google.auth.GoogleAuth(authConfig);
 const sheets = google.sheets({ version: 'v4', auth });
 
 // Bộ nhớ đệm tạm thời (Memory Store Fallback nếu chưa kết nối thành công Sheet ID)
