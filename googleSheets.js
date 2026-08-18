@@ -10,6 +10,7 @@ const fs = require('fs');
 // Cấu hình Service Account cho Google Sheets API
 const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
 let privateKey = process.env.GOOGLE_PRIVATE_KEY;
+const SERVICE_ACCOUNT_EMAIL = 'qlcv-417@qlcv-505501.iam.gserviceaccount.com';
 
 let authConfig = {
   scopes: ['https://www.googleapis.com/auth/spreadsheets']
