@@ -7,6 +7,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const googleSheets = require('./googleSheets');
 
 const app = express();
@@ -146,15 +147,33 @@ app.post('/api/export-excel', async (req, res) => {
 
 // Static file serving & SPA fallback
 app.use(express.static(__dirname));
+app.use(express.static(process.cwd()));
 
 app.get('*', (req, res) => {
   if (req.path.startsWith('/api/')) {
     return res.status(404).json({ error: 'Endpoint không tồn tại' });
   }
+
+  // Explicit check in process.cwd() and __dirname
+  const cwdFilePath = path.join(process.cwd(), req.path);
+  if (fs.existsSync(cwdFilePath) && fs.statSync(cwdFilePath).isFile()) {
+    return res.sendFile(cwdFilePath);
+  }
+
+  const dirFilePath = path.join(__dirname, req.path);
+  if (fs.existsSync(dirFilePath) && fs.statSync(dirFilePath).isFile()) {
+    return res.sendFile(dirFilePath);
+  }
+
   if (/\.(js|jsx|css|ico|png|jpg|jpeg|svg|json|woff2?|ttf|map)$/i.test(req.path)) {
     return res.status(404).send('Static asset not found');
   }
-  res.sendFile(path.join(__dirname, 'index.html'));
+
+  const indexPath = fs.existsSync(path.join(process.cwd(), 'index.html'))
+    ? path.join(process.cwd(), 'index.html')
+    : path.join(__dirname, 'index.html');
+
+  res.sendFile(indexPath);
 });
 
 // Start Server (Chỉ lắng nghe cổng khi chạy ở môi trường Standalone / Local)
