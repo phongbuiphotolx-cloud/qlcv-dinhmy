@@ -1,6 +1,22 @@
 {
   "version": 2,
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" }
+  "builds": [
+    {
+      "src": "server.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "index.html",
+          "css/**",
+          "js/**",
+          "favicon.ico",
+          "logo.ico",
+          "logo.ico.ico"
+        ]
+      }
+    }
+  ],
+  "routes": [
+    { "src": "/(.*)", "dest": "server.js" }
   ]
 }
