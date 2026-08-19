@@ -144,17 +144,13 @@ app.post('/api/export-excel', async (req, res) => {
   }
 });
 
-// ----------------------------------------------------------------------
-// STATIC FILE SERVING & SPA FALLBACK
-// ----------------------------------------------------------------------
+// Static file serving & SPA fallback
 app.use(express.static(__dirname));
 
-// SPA Fallback cho các sub-path (ví dụ /quan-ly-cong-viec, /danh-muc/...)
 app.get('*', (req, res) => {
   if (req.path.startsWith('/api/')) {
     return res.status(404).json({ error: 'Endpoint không tồn tại' });
   }
-  // Nếu yêu cầu là file tĩnh (.js, .jsx, .css, .ico, .png...) mà không tồn tại, trả về 404 thay vì HTML
   if (/\.(js|jsx|css|ico|png|jpg|jpeg|svg|json|woff2?|ttf|map)$/i.test(req.path)) {
     return res.status(404).send('Static asset not found');
   }
