@@ -121,7 +121,6 @@ function LoginScreen({ onLogin, error, setError }) {
               </div>
               <input
                 type="text"
-                placeholder="Nhập tên tài khoản (ví dụ: admin)"
                 value={username}
                 onChange={e => { setUsername(e.target.value); if (setError) setError(''); }}
                 className="form-input pl-9 text-xs h-10 w-full"
@@ -139,7 +138,6 @@ function LoginScreen({ onLogin, error, setError }) {
               </div>
               <input
                 type={showPassword ? 'text' : 'password'}
-                placeholder="Nhập mật khẩu..."
                 value={password}
                 onChange={e => { setPassword(e.target.value); if (setError) setError(''); }}
                 className="form-input pl-9 pr-9 text-xs h-10 w-full"
