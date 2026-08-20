@@ -333,11 +333,11 @@ async function getData() {
       });
     }
 
-    // 3. Parse Settings
+    // 3. Parse Settings (Đọc đầy đủ tất cả phòng ban từ Cột A bắt đầu từ hàng 4)
     const departments = [];
-    for (let r = 3; r < Math.min(6, setRows.length); r++) {
+    for (let r = 3; r < setRows.length; r++) {
       const val = String(setRows[r]?.[0] || '').trim();
-      if (val) departments.push(val);
+      if (val && !departments.includes(val)) departments.push(val);
     }
 
     const agencies = [];
@@ -411,6 +411,25 @@ async function addItem(type, data) {
   }
 
   const currentData = await getData();
+
+  if (type === 'departments') {
+    let deptName = typeof data === 'object' ? (data.name || data.phong_ban || '') : String(data);
+    deptName = String(deptName).trim();
+    if (!deptName) throw new Error('Tên phòng ban không được để rỗng.');
+
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Settings!A4:A200' });
+    const existing = res.data.values || [];
+    const targetRow = existing.length + 4;
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `Settings!A${targetRow}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [[deptName]] }
+    });
+
+    return { success: true, name: deptName, excel_row: targetRow, message: 'Added department successfully' };
+  }
 
   if (type === 'agencies') {
     let agencyName = typeof data === 'object' ? (data.name || data.noi_ban_hanh || '') : String(data);
@@ -525,6 +544,29 @@ async function updateItem(type, data) {
       if (idx !== -1) memData.tasks[idx] = { ...memData.tasks[idx], ...data };
     }
     return { success: true, message: 'Updated item (in-memory)' };
+  }
+
+  if (type === 'departments') {
+    const oldName = String(data.oldName || data.name || '').trim();
+    const newName = String(data.newName || '').trim();
+
+    if (oldName && newName) {
+      const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Settings!A4:A200' });
+      const rows = res.data.values || [];
+      for (let i = 0; i < rows.length; i++) {
+        if (String(rows[i][0] || '').trim() === oldName) {
+          const rowNum = i + 4;
+          await sheets.spreadsheets.values.update({
+            spreadsheetId,
+            range: `Settings!A${rowNum}`,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: { values: [[newName]] }
+          });
+          break;
+        }
+      }
+    }
+    return { success: true, oldName, newName, message: 'Updated department successfully' };
   }
 
   if (type === 'agencies') {
@@ -695,6 +737,22 @@ async function deleteItem(type, id, data) {
       memData.tasks = memData.tasks.filter(t => t.id !== parseInt(id, 10));
     }
     return { success: true, message: 'Deleted item (in-memory)' };
+  }
+
+  if (type === 'departments') {
+    const targetName = String(data?.name || data?.oldName || id || '').trim();
+    if (targetName) {
+      const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Settings!A4:A200' });
+      const rows = res.data.values || [];
+      for (let i = 0; i < rows.length; i++) {
+        if (String(rows[i][0] || '').trim() === targetName) {
+          const rowNum = i + 4;
+          await sheets.spreadsheets.values.clear({ spreadsheetId, range: `Settings!A${rowNum}` });
+          break;
+        }
+      }
+    }
+    return { success: true, name: targetName, message: 'Deleted department successfully' };
   }
 
   if (type === 'agencies') {

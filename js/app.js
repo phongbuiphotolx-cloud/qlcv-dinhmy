@@ -760,6 +760,7 @@ function App() {
               tasks={visibleTasks}
               filters={filters}
               setFilters={setFilters}
+              categories={categories}
               onOpenDetail={(task) => setModals(prev => ({ ...prev, taskDetail: task }))}
             />
           )}
@@ -1862,7 +1863,17 @@ function DateInput({ value, onChange, placeholder = 'dd/mm/yyyy' }) {
 // ----------------------------------------------------------------------
 // 5. DASHBOARD VIEW COMPONENT
 // ----------------------------------------------------------------------
-function DashboardView({ tasks, filters, setFilters, onOpenDetail }) {
+function DashboardView({ tasks, filters, setFilters, onOpenDetail, categories }) {
+  // Extract dynamic department list (reads directly from Settings!A4:A500 via categories.departments)
+  const departmentList = useMemo(() => {
+    if (categories?.departments && Array.isArray(categories.departments) && categories.departments.length > 0) {
+      return categories.departments;
+    }
+    const deptsFromTasks = Array.from(new Set((tasks || []).map(t => t.phong_ban).filter(Boolean)));
+    if (deptsFromTasks.length > 0) return deptsFromTasks;
+    return window.INITIAL_CATEGORIES?.departments || ['Kinh tế', 'VH - XH'];
+  }, [categories, tasks]);
+
   // Chart references
   const monthlyChartRef = useRef(null);
   const statusChartRef = useRef(null);
@@ -2175,8 +2186,9 @@ function DashboardView({ tasks, filters, setFilters, onOpenDetail }) {
               className="form-select w-full"
             >
               <option value="">-- Tất cả phòng ban --</option>
-              <option value="Kinh tế">Kinh tế</option>
-              <option value="VH - XH">VH - XH</option>
+              {departmentList.map((dept, idx) => (
+                <option key={idx} value={dept}>{dept}</option>
+              ))}
             </select>
           </div>
 
