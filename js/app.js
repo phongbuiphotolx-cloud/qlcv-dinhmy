@@ -2846,11 +2846,11 @@ function TasksView({
       {/* DESKTOP TABLE VIEW */}
       <div className="hidden md:block bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="custom-table">
+          <table className="custom-table w-full">
             <thead>
               <tr>
                 {!isViewOnly && (
-                  <th className="w-10 text-center">
+                  <th className="w-8 text-center px-1">
                     <input
                       type="checkbox"
                       checked={selectedTaskIds.length > 0 && selectedTaskIds.length === paginatedTasks.length}
@@ -2859,22 +2859,22 @@ function TasksView({
                     />
                   </th>
                 )}
-                <th className="w-12 text-center">STT</th>
-                <th>Số công văn</th>
-                <th>Tên công việc</th>
-                <th>Người phụ trách</th>
-                <th>Deadline</th>
-                <th>Ngày hoàn thành</th>
-                <th>Trạng thái</th>
-                <th>Đánh giá</th>
-                <th className="text-center">Thao tác</th>
+                <th className="w-10 text-center px-1">STT</th>
+                <th className="w-28 text-left px-1.5">Số công văn</th>
+                <th className="text-left px-2">Tên công việc</th>
+                <th className="w-28 text-left px-1.5">Người phụ trách</th>
+                <th className="w-24 text-center px-1">Deadline</th>
+                <th className="w-24 text-center px-1">Ngày hoàn thành</th>
+                <th className="w-24 text-center px-1">Trạng thái</th>
+                <th className="w-20 text-center px-1">Đánh giá</th>
+                <th className="w-20 text-center px-1">Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {paginatedTasks.map((task, idx) => (
                 <tr key={task.id} className={selectedTaskIds.includes(task.id) ? 'bg-blue-50/50' : ''}>
                   {!isViewOnly && (
-                    <td className="text-center">
+                    <td className="text-center px-1">
                       <input
                         type="checkbox"
                         checked={selectedTaskIds.includes(task.id)}
@@ -2883,47 +2883,50 @@ function TasksView({
                       />
                     </td>
                   )}
-                  <td className="text-slate-400 font-mono text-xs text-center">{(currentPage - 1) * pageSize + idx + 1}</td>
-                  <td className="align-top whitespace-nowrap">
+                  <td className="text-slate-400 font-mono text-xs text-center px-1">{(currentPage - 1) * pageSize + idx + 1}</td>
+                  <td className="align-top text-xs px-1.5 py-2.5 w-28">
                     <div
-                      className={`font-bold cursor-pointer hover:underline ${
+                      className={`font-bold cursor-pointer hover:underline leading-tight break-words ${
                         isTaskOverdue(task) ? 'text-rose-600 font-extrabold' : 'text-blue-600'
                       }`}
                       onClick={() => onOpenDetail(task)}
+                      title={task.so_cong_van}
                     >
                       {task.so_cong_van || '--'}
                     </div>
-                    <div className="text-xs text-slate-500 font-normal mt-0.5">
-                      {task.noi_ban_hanh || 'UBND tỉnh An Giang'}
+                    <div className="text-[11px] text-slate-400 font-normal mt-0.5 truncate" title={task.noi_ban_hanh}>
+                      {task.noi_ban_hanh || 'UBND tỉnh'}
                     </div>
                   </td>
-                  <td className="max-w-xs truncate font-medium text-slate-900 cursor-pointer hover:text-blue-600 align-top" onClick={() => onOpenDetail(task)} title={task.ten_cong_viec}>
-                    {task.ten_cong_viec}
+                  <td className="align-top py-2.5 px-2 text-xs font-medium text-slate-900 cursor-pointer hover:text-blue-600" onClick={() => onOpenDetail(task)}>
+                    <div className="line-clamp-2 leading-snug" title={task.ten_cong_viec}>
+                      {task.ten_cong_viec}
+                    </div>
                   </td>
-                  <td className="align-top whitespace-nowrap">
-                    <div className="text-xs text-slate-500 font-normal">
+                  <td className="align-top text-xs px-1.5 py-2.5 w-28">
+                    <div className="text-[11px] text-slate-400 font-normal truncate" title={task.phong_ban}>
                       {task.phong_ban || 'Kinh tế'}
                     </div>
-                    <div className="font-bold text-slate-800 text-xs mt-0.5">
+                    <div className="font-bold text-slate-800 text-xs mt-0.5 truncate" title={task.nguoi_phu_trach}>
                       {task.nguoi_phu_trach || 'Chưa phân công'}
                     </div>
                   </td>
-                  <td className="text-xs font-mono align-top whitespace-nowrap">{formatDate(task.deadline)}</td>
-                  <td className="text-xs font-mono align-top whitespace-nowrap">{formatDate(task.ngay_hoan_thanh)}</td>
-                  <td className="align-top whitespace-nowrap"><StatusBadge status={task.trang_thai} /></td>
-                  <td className="align-top whitespace-nowrap"><RatingBadge rating={task.danh_gia} /></td>
-                  <td className="align-top whitespace-nowrap text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      <button onClick={() => onOpenDetail(task)} className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-lg" title="Xem chi tiết">
-                        <i data-lucide="eye" className="w-4 h-4"></i>
+                  <td className="text-xs font-mono align-top text-center py-2.5 px-1 w-24 whitespace-nowrap">{formatDate(task.deadline)}</td>
+                  <td className="text-xs font-mono align-top text-center py-2.5 px-1 w-24 whitespace-nowrap">{formatDate(task.ngay_hoan_thanh)}</td>
+                  <td className="align-top text-center py-2.5 px-1 w-24 whitespace-nowrap"><StatusBadge status={task.trang_thai} /></td>
+                  <td className="align-top text-center py-2.5 px-1 w-20 whitespace-nowrap"><RatingBadge rating={task.danh_gia} /></td>
+                  <td className="align-top text-center py-2.5 px-1 w-20 whitespace-nowrap">
+                    <div className="flex items-center justify-center gap-0.5">
+                      <button onClick={() => onOpenDetail(task)} className="p-1 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded" title="Xem chi tiết">
+                        <i data-lucide="eye" className="w-3.5 h-3.5"></i>
                       </button>
                       {!isViewOnly && (
                         <>
-                          <button onClick={() => onOpenEditTask(task)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg" title="Chỉnh sửa thông tin công việc">
-                            <i data-lucide="edit-3" className="w-4 h-4"></i>
+                          <button onClick={() => onOpenEditTask(task)} className="p-1 text-blue-600 hover:bg-blue-50 rounded" title="Chỉnh sửa thông tin công việc">
+                            <i data-lucide="edit-3" className="w-3.5 h-3.5"></i>
                           </button>
-                          <button onClick={() => onConfirmDelete(task.id)} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg" title="Xóa">
-                            <i data-lucide="trash-2" className="w-4 h-4"></i>
+                          <button onClick={() => onConfirmDelete(task.id)} className="p-1 text-rose-500 hover:bg-rose-50 rounded" title="Xóa">
+                            <i data-lucide="trash-2" className="w-3.5 h-3.5"></i>
                           </button>
                         </>
                       )}
