@@ -8,23 +8,66 @@ const path = require('path');
 const fs = require('fs');
 
 // Cấu hình Service Account cho Google Sheets API
-const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
-let privateKey = process.env.GOOGLE_PRIVATE_KEY;
 const SERVICE_ACCOUNT_EMAIL = 'qlcv-417@qlcv-505501.iam.gserviceaccount.com';
+
+function getGoogleCredentials() {
+  // Option 1: Chuỗi JSON nguyên bản từ GOOGLE_SERVICE_ACCOUNT_JSON hoặc GOOGLE_CREDENTIALS_JSON
+  const rawJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON || process.env.GOOGLE_CREDENTIALS_JSON;
+  if (rawJson) {
+    try {
+      let cleanJson = rawJson.trim();
+      if ((cleanJson.startsWith("'") && cleanJson.endsWith("'")) || (cleanJson.startsWith('"') && cleanJson.endsWith('"'))) {
+        cleanJson = cleanJson.slice(1, -1).trim();
+      }
+      const parsed = JSON.parse(cleanJson);
+      if (parsed.client_email && parsed.private_key) {
+        let pk = parsed.private_key;
+        pk = pk.replace(/\\n/g, '\n').replace(/\r\n/g, '\n');
+        return {
+          client_email: parsed.client_email.trim(),
+          private_key: pk
+        };
+      }
+    } catch (err) {
+      console.error('[Google Sheets API] Lỗi parse GOOGLE_SERVICE_ACCOUNT_JSON:', err.message);
+    }
+  }
+
+  // Option 2: Từng biến môi trường riêng lẻ GOOGLE_CLIENT_EMAIL & GOOGLE_PRIVATE_KEY
+  const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
+  const privateKey = process.env.GOOGLE_PRIVATE_KEY;
+
+  if (clientEmail && privateKey) {
+    let cleanEmail = clientEmail.trim();
+    if ((cleanEmail.startsWith('"') && cleanEmail.endsWith('"')) || (cleanEmail.startsWith("'") && cleanEmail.endsWith("'"))) {
+      cleanEmail = cleanEmail.slice(1, -1).trim();
+    }
+
+    let cleanKey = privateKey.trim();
+    // Loại bỏ dấu ngoặc bọc ngoài nếu người dùng lỡ dán dính dấu nháy kép/nháy đơn trên Vercel
+    if ((cleanKey.startsWith('"') && cleanKey.endsWith('"')) || (cleanKey.startsWith("'") && cleanKey.endsWith("'"))) {
+      cleanKey = cleanKey.slice(1, -1).trim();
+    }
+    // Chuyển đổi các dạng escape xuống dòng \\n thành \n thực sự
+    cleanKey = cleanKey.replace(/\\n/g, '\n').replace(/\r\n/g, '\n');
+
+    return {
+      client_email: cleanEmail,
+      private_key: cleanKey
+    };
+  }
+
+  return null;
+}
 
 let authConfig = {
   scopes: ['https://www.googleapis.com/auth/spreadsheets']
 };
 
-if (clientEmail && privateKey) {
-  // Ưu tiên sử dụng Biến Môi Trường (Vercel / Cloud Deployment)
-  privateKey = privateKey.replace(/\\n/g, '\n');
-  authConfig.credentials = {
-    client_email: clientEmail,
-    private_key: privateKey
-  };
+const credentials = getGoogleCredentials();
+if (credentials) {
+  authConfig.credentials = credentials;
 } else {
-  // Dùng JSON key file khi chạy ở môi trường Local Development
   const KEY_FILE = process.env.GOOGLE_APPLICATION_CREDENTIALS || path.join(__dirname, 'qlcv-505501-c6ad069851e0.json');
   authConfig.keyFile = KEY_FILE;
 }
