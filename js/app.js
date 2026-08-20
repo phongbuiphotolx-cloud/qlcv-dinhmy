@@ -4420,12 +4420,8 @@ function KPIView({ tasks = [], employees = [], categories = {}, user, addToast }
 
   return (
     <div className="space-y-4">
-      {/* Title & Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 px-1">
-        <div>
-          <h2 className="text-lg font-bold text-slate-900 leading-tight">Đánh giá Hiệu suất KPI Công chức</h2>
-          <p className="text-xs text-slate-500">Áp dụng công thức: Điểm = Tỷ lệ % - (5 điểm x số CV quá hạn)</p>
-        </div>
+      {/* Header Info */}
+      <div className="flex justify-end px-1">
         <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200/60">
           Hiển thị {kpiData.length} công chức
         </span>
@@ -4536,13 +4532,12 @@ function KPIView({ tasks = [], employees = [], categories = {}, user, addToast }
               <th className="w-24 text-center">Hoàn thành</th>
               <th className="w-24 text-center">Quá hạn</th>
               <th className="w-24 text-center">Tỷ lệ %</th>
-              <th className="w-28 text-center">Điểm KPI</th>
             </tr>
           </thead>
           <tbody>
             {kpiData.length === 0 ? (
               <tr>
-                <td colSpan="8" className="text-center py-8 text-slate-400 text-xs font-medium">
+                <td colSpan="7" className="text-center py-8 text-slate-400 text-xs font-medium">
                   Không tìm thấy công chức phù hợp với bộ lọc hiện tại.
                 </td>
               </tr>
@@ -4589,9 +4584,6 @@ function KPIView({ tasks = [], employees = [], categories = {}, user, addToast }
                     </button>
                   </td>
                   <td className="text-center font-mono font-semibold text-slate-700">{emp.rate}%</td>
-                  <td className="text-center">
-                    <span className="font-bold text-blue-600 text-sm">{emp.score} pt</span>
-                  </td>
                 </tr>
               ))
             )}
