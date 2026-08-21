@@ -916,7 +916,7 @@ function Sidebar({ activeTab, setActiveTab, user, onLogout, isCollapsed = false,
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
     { id: 'tasks', label: 'Quản lý công việc', icon: 'check-square' },
-    { id: 'kpi', label: 'KPI & Đánh giá', icon: 'award' },
+    { id: 'kpi', label: 'Đánh giá công việc', icon: 'award' },
     { id: 'reports', label: 'Báo cáo tổng hợp', icon: 'bar-chart-3' }
   ];
 
@@ -1181,7 +1181,7 @@ function Topbar({ user, activeTab, setActiveTab, onOpenMobileDrawer, onLogout, d
       case 'dashboard': return 'Dashboard';
       case 'tasks': return 'Quản lý công việc';
       case 'employees': return 'Nhân viên';
-      case 'kpi': return 'KPI & Đánh giá';
+      case 'kpi': return 'Đánh giá công việc';
       case 'reports': return 'Báo cáo tổng hợp';
       case 'categories':
       case 'category-agencies': return 'Quản lý danh mục - Nơi ban hành';
@@ -1451,7 +1451,7 @@ function MobileDrawer({ isOpen, onClose, activeTab, setActiveTab, user, onLogout
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
     { id: 'tasks', label: 'Quản lý công việc', icon: 'check-square' },
-    { id: 'kpi', label: 'KPI & Đánh giá', icon: 'award' },
+    { id: 'kpi', label: 'Đánh giá công việc', icon: 'award' },
     { id: 'reports', label: 'Báo cáo tổng hợp', icon: 'bar-chart-3' }
   ];
 
@@ -3635,6 +3635,14 @@ function EmployeesView({ employees, setEmployees, categories, onRefresh, addToas
   const [filterDepartment, setFilterDepartment] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
 
+  // Pagination States
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterName, filterDepartment, filterStatus, empList]);
+
   const departmentList = useMemo(() => {
     if (categories?.departments && Array.isArray(categories.departments) && categories.departments.length > 0) {
       return categories.departments;
@@ -3677,10 +3685,17 @@ function EmployeesView({ employees, setEmployees, categories, onRefresh, addToas
     });
   }, [empList, filterName, filterDepartment, filterStatus]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredEmpList.length / pageSize));
+  const paginatedEmpList = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredEmpList.slice(start, start + pageSize);
+  }, [filteredEmpList, currentPage, pageSize]);
+
   const handleResetFilters = () => {
     setFilterName('');
     setFilterDepartment('');
     setFilterStatus('');
+    setCurrentPage(1);
   };
 
   const [addFormData, setAddFormData] = useState({
@@ -3990,9 +4005,9 @@ function EmployeesView({ employees, setEmployees, categories, onRefresh, addToas
             </tr>
           </thead>
           <tbody>
-            {filteredEmpList.map((emp, idx) => (
+            {paginatedEmpList.map((emp, idx) => (
               <tr key={emp.ma_nv + idx} className="hover:bg-slate-50/80 transition-colors">
-                <td className="text-center font-mono font-semibold text-slate-500">{idx + 1}</td>
+                <td className="text-center font-mono font-semibold text-slate-500">{(currentPage - 1) * pageSize + idx + 1}</td>
                 <td className="font-mono font-semibold text-blue-600">{emp.ma_nv}</td>
                 <td className="font-bold text-slate-900">{emp.ho_ten}</td>
                 <td className="font-medium text-slate-700">{emp.phong_ban || 'Phòng Kinh tế'}</td>
@@ -4039,6 +4054,29 @@ function EmployeesView({ employees, setEmployees, categories, onRefresh, addToas
             )}
           </tbody>
         </table>
+
+        {/* Pagination Footer */}
+        <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+          <div className="flex items-center gap-2">
+            <span>Hiển thị</span>
+            <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }} className="form-select h-8 text-xs py-0">
+              <option value={10}>10 dòng</option>
+              <option value={25}>25 dòng</option>
+              <option value={50}>50 dòng</option>
+            </select>
+            <span>/ Tổng {filteredEmpList.length} dòng</span>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40">
+              <i data-lucide="chevron-left" className="w-4 h-4"></i>
+            </button>
+            <span className="px-3 py-1 font-semibold text-slate-700">Trang {currentPage} / {totalPages}</span>
+            <button disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40">
+              <i data-lucide="chevron-right" className="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Add Employee Modal */}
@@ -5258,6 +5296,26 @@ function CategoriesView({ subTab, categories, setCategories, employees, setEmplo
   const [agencyInput, setAgencyInput] = useState('');
   const [agencyEditInput, setAgencyEditInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Agency Pagination States
+  const [agencyCurrentPage, setAgencyCurrentPage] = useState(1);
+  const [agencyPageSize, setAgencyPageSize] = useState(10);
+
+  useEffect(() => {
+    if (window.lucide) {
+      window.lucide.createIcons();
+    }
+  });
+
+  useEffect(() => {
+    setAgencyCurrentPage(1);
+  }, [subTab, agenciesList.length]);
+
+  const agencyTotalPages = Math.max(1, Math.ceil(agenciesList.length / agencyPageSize));
+  const paginatedAgencies = useMemo(() => {
+    const start = (agencyCurrentPage - 1) * agencyPageSize;
+    return agenciesList.slice(start, start + agencyPageSize);
+  }, [agenciesList, agencyCurrentPage, agencyPageSize]);
 
   useEffect(() => {
     if (editingAgency) {
