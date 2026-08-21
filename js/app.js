@@ -106,7 +106,7 @@ function LoginScreen({ onLogin, error, setError }) {
       <div className="w-full max-w-md bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-6 md:p-8 space-y-6 z-10 animate-slideUp">
         <div className="text-center space-y-2">
           <div className="w-14 h-14 bg-gradient-to-tr from-blue-700 to-sky-500 text-white rounded-2xl flex items-center justify-center mx-auto shadow-lg shadow-blue-500/30">
-            <i data-lucide="shield-check" className="w-8 h-8"></i>
+            <Icon name="shield-check" className="w-8 h-8" />
           </div>
           <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">HỆ THỐNG QUẢN LÝ CÔNG VIỆC</h1>
           <p className="text-xs font-semibold uppercase text-blue-600 tracking-wider">ỦY BAN NHÂN DÂN XÃ ĐỊNH MỸ</p>
@@ -114,7 +114,7 @@ function LoginScreen({ onLogin, error, setError }) {
 
         {error && (
           <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center gap-2 animate-fadeIn">
-            <i data-lucide="alert-circle" className="w-4 h-4 shrink-0 text-rose-600"></i>
+            <Icon name="alert-circle" className="w-4 h-4 shrink-0 text-rose-600" />
             <span>{error}</span>
           </div>
         )}
@@ -124,7 +124,7 @@ function LoginScreen({ onLogin, error, setError }) {
             <label className="block text-xs font-bold uppercase text-slate-700 mb-1.5">Tài khoản *</label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                <i data-lucide="user" className="w-4 h-4"></i>
+                <Icon name="user" className="w-4 h-4" />
               </div>
               <input
                 type="text"
@@ -141,7 +141,7 @@ function LoginScreen({ onLogin, error, setError }) {
             <label className="block text-xs font-bold uppercase text-slate-700 mb-1.5">Mật khẩu *</label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                <i data-lucide="lock" className="w-4 h-4"></i>
+                <Icon name="lock" className="w-4 h-4" />
               </div>
               <input
                 type={showPassword ? 'text' : 'password'}
@@ -155,7 +155,7 @@ function LoginScreen({ onLogin, error, setError }) {
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
               >
-                <i data-lucide={showPassword ? 'eye-off' : 'eye'} className="w-4 h-4"></i>
+                <Icon name={showPassword ? 'eye-off' : 'eye'} className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -172,7 +172,7 @@ function LoginScreen({ onLogin, error, setError }) {
               </>
             ) : (
               <>
-                <i data-lucide="log-in" className="w-4 h-4"></i>
+                <Icon name="log-in" className="w-4 h-4" />
                 <span>Đăng nhập hệ thống</span>
               </>
             )}
