@@ -5297,7 +5297,8 @@ function CategoriesView({ subTab, categories, setCategories, employees, setEmplo
   const [agencyEditInput, setAgencyEditInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Agency Pagination States
+  // Agency Filter & Pagination States
+  const [agencySearchQuery, setAgencySearchQuery] = useState('');
   const [agencyCurrentPage, setAgencyCurrentPage] = useState(1);
   const [agencyPageSize, setAgencyPageSize] = useState(10);
 
@@ -5307,15 +5308,21 @@ function CategoriesView({ subTab, categories, setCategories, employees, setEmplo
     }
   });
 
+  const filteredAgenciesList = useMemo(() => {
+    if (!agencySearchQuery.trim()) return agenciesList;
+    const query = agencySearchQuery.trim().toLowerCase();
+    return agenciesList.filter(item => (item || '').toLowerCase().includes(query));
+  }, [agenciesList, agencySearchQuery]);
+
   useEffect(() => {
     setAgencyCurrentPage(1);
-  }, [subTab, agenciesList.length]);
+  }, [subTab, agencySearchQuery, agenciesList.length]);
 
-  const agencyTotalPages = Math.max(1, Math.ceil(agenciesList.length / agencyPageSize));
+  const agencyTotalPages = Math.max(1, Math.ceil(filteredAgenciesList.length / agencyPageSize));
   const paginatedAgencies = useMemo(() => {
     const start = (agencyCurrentPage - 1) * agencyPageSize;
-    return agenciesList.slice(start, start + agencyPageSize);
-  }, [agenciesList, agencyCurrentPage, agencyPageSize]);
+    return filteredAgenciesList.slice(start, start + agencyPageSize);
+  }, [filteredAgenciesList, agencyCurrentPage, agencyPageSize]);
 
   useEffect(() => {
     if (editingAgency) {
@@ -5424,7 +5431,7 @@ function CategoriesView({ subTab, categories, setCategories, employees, setEmplo
             </div>
             <div className="flex items-center gap-3">
               <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200/60">
-                {agenciesList.length} đơn vị
+                {agencySearchQuery.trim() ? `${filteredAgenciesList.length} / ${agenciesList.length} đơn vị` : `${agenciesList.length} đơn vị`}
               </span>
               <button
                 onClick={() => setShowAddAgencyModal(true)}
@@ -5433,6 +5440,42 @@ function CategoriesView({ subTab, categories, setCategories, employees, setEmplo
                 <i data-lucide="plus" className="w-3.5 h-3.5"></i>
                 <span>Thêm mới nơi ban hành</span>
               </button>
+            </div>
+          </div>
+
+          {/* Search Filter Bar */}
+          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 text-xs">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  placeholder="Nhập tên nơi ban hành..."
+                  value={agencySearchQuery}
+                  onChange={e => setAgencySearchQuery(e.target.value)}
+                  className="form-input pl-9 pr-8 text-xs py-2 w-full"
+                />
+                <i data-lucide="search" className="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                {agencySearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setAgencySearchQuery('')}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                    title="Xóa tìm kiếm"
+                  >
+                    <i data-lucide="x" className="w-3.5 h-3.5"></i>
+                  </button>
+                )}
+              </div>
+              {agencySearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setAgencySearchQuery('')}
+                  className="btn-secondary text-xs h-[36px] px-3 font-semibold inline-flex items-center justify-center gap-1.5 shrink-0"
+                >
+                  <i data-lucide="rotate-ccw" className="w-3.5 h-3.5"></i>
+                  <span>Đặt lại</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -5488,10 +5531,10 @@ function CategoriesView({ subTab, categories, setCategories, employees, setEmplo
                     </td>
                   </tr>
                 ))}
-                {agenciesList.length === 0 && (
+                {filteredAgenciesList.length === 0 && (
                   <tr>
                     <td colSpan={4} className="text-center py-8 text-slate-400 text-xs">
-                      Chưa có nơi ban hành nào trong danh mục.
+                      {agencySearchQuery.trim() ? 'Chưa tìm thấy nơi ban hành nào phù hợp.' : 'Chưa có nơi ban hành nào trong danh mục.'}
                     </td>
                   </tr>
                 )}
@@ -5507,7 +5550,7 @@ function CategoriesView({ subTab, categories, setCategories, employees, setEmplo
                   <option value={25}>25 dòng</option>
                   <option value={50}>50 dòng</option>
                 </select>
-                <span>/ Tổng {agenciesList.length} dòng</span>
+                <span>/ Tổng {filteredAgenciesList.length} dòng</span>
               </div>
 
               <div className="flex items-center gap-1">
