@@ -159,6 +159,50 @@ function getSpreadsheetId() {
   return '';
 }
 
+// Lấy numeric sheetId dựa trên tên tab
+async function getSheetIdByTitle(spreadsheetId, title) {
+  try {
+    const meta = await sheets.spreadsheets.get({ spreadsheetId });
+    const sheetsList = meta.data.sheets || [];
+    const targetSheet = sheetsList.find(s => s.properties?.title === title);
+    return targetSheet ? targetSheet.properties.sheetId : null;
+  } catch (err) {
+    console.error(`[Google Sheets API] Lỗi lấy sheetId cho tab '${title}':`, err.message);
+    return null;
+  }
+}
+
+// Xóa hoàn toàn dòng khỏi Google Sheets (deleteDimension), không để lại dòng trống
+async function deleteSheetRow(spreadsheetId, tabTitle, targetRow) {
+  if (!spreadsheetId || !targetRow || targetRow < 4) return;
+  const sheetId = await getSheetIdByTitle(spreadsheetId, tabTitle);
+  if (sheetId !== null) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            deleteDimension: {
+              range: {
+                sheetId: sheetId,
+                dimension: 'ROWS',
+                startIndex: targetRow - 1,
+                endIndex: targetRow
+              }
+            }
+          }
+        ]
+      }
+    });
+  } else {
+    // Fallback xóa nội dung dải ô nếu không lấy được sheetId
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId,
+      range: `${tabTitle}!A${targetRow}:L${targetRow}`
+    });
+  }
+}
+
 // Đảm bảo tiêu đề các tab sheet tồn tại
 async function ensureSheetTabs(spreadsheetId) {
   try {
@@ -787,7 +831,7 @@ async function deleteItem(type, id, data) {
 
     if (!targetRow) throw new Error(`Không tìm thấy công chức Mã NV '${targetMaNV}' để xóa!`);
 
-    await sheets.spreadsheets.values.clear({ spreadsheetId, range: `Employees!A${targetRow}:E${targetRow}` });
+    await deleteSheetRow(spreadsheetId, 'Employees', targetRow);
     return { success: true, ma_nv: targetMaNV, excel_row: targetRow, message: 'Deleted employee successfully' };
   }
 
@@ -846,8 +890,8 @@ async function deleteItem(type, id, data) {
   }
 
   if (targetRow >= 4) {
-    // CHỈ xóa dữ liệu trong Cột A đến Cột L, bảo vệ công thức cột M đến R
-    await sheets.spreadsheets.values.clear({ spreadsheetId, range: `Tasks!A${targetRow}:L${targetRow}` });
+    // Xóa hoàn toàn dòng khỏi Google Sheets (deleteDimension), không để lại dòng trống
+    await deleteSheetRow(spreadsheetId, 'Tasks', targetRow);
   }
 
   return { success: true, id, message: 'Deleted task successfully' };
