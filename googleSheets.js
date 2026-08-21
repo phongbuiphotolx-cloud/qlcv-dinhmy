@@ -264,7 +264,7 @@ async function getData() {
 
     const res = await sheets.spreadsheets.values.batchGet({
       spreadsheetId,
-      ranges: ['Tasks!A1:O500', 'Employees!A1:E500', 'Settings!A1:O500']
+      ranges: ['Tasks!A1:R500', 'Employees!A1:E500', 'Settings!A1:O500']
     });
 
     const valueRanges = res.data.valueRanges || [];
@@ -503,23 +503,23 @@ async function addItem(type, data) {
 
   // Default: Tasks
   const statusVal = data.trang_thai || 'Đang thực hiện';
-  const ratingVal = data.danh_gia || '--';
 
   const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Tasks!A4:A500' });
   const existing = res.data.values || [];
   const targetRow = existing.length + 4;
 
+  // CHỈ ghi 12 cột thông tin từ Cột A đến Cột L.
+  // Tuyệt đối KHÔNG ghi đè lên các cột M đến R chứa công thức tự động trên Google Sheets.
   const newRowValues = [
     String(data.noi_ban_hanh || ''), String(data.so_cong_van || ''), String(data.ten_cong_viec || ''),
     String(data.mo_ta || ''), String(data.phong_ban || ''), String(data.nguoi_phu_trach || ''),
     String(data.ngay_tao || ''), String(data.deadline || ''), String(data.ngay_hoan_thanh || ''),
-    String(statusVal), String(data.ket_qua || ''), String(data.ghi_chu || ''),
-    '', '', String(ratingVal)
+    String(statusVal), String(data.ket_qua || ''), String(data.ghi_chu || '')
   ];
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `Tasks!A${targetRow}:O${targetRow}`,
+    range: `Tasks!A${targetRow}:L${targetRow}`,
     valueInputOption: 'USER_ENTERED',
     requestBody: { values: [newRowValues] }
   });
@@ -656,7 +656,7 @@ async function updateItem(type, data) {
   }
 
   // Default: Tasks
-  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Tasks!A4:O500' });
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Tasks!A4:R500' });
   const rows = res.data.values || [];
   let targetRow = 0;
 
@@ -695,6 +695,7 @@ async function updateItem(type, data) {
 
   if (targetRow >= 4) {
     const cur = rows[targetRow - 4] || [];
+    // CHỈ cập nhật Cột A đến Cột L (12 cột), bảo vệ nguyên vẹn công thức các cột M đến R
     const updatedRow = [
       data.noi_ban_hanh !== undefined ? String(data.noi_ban_hanh) : (cur[0] || ''),
       data.so_cong_van !== undefined ? String(data.so_cong_van) : (cur[1] || ''),
@@ -707,14 +708,12 @@ async function updateItem(type, data) {
       data.ngay_hoan_thanh !== undefined ? String(data.ngay_hoan_thanh) : (cur[8] || ''),
       data.trang_thai !== undefined ? String(data.trang_thai) : (cur[9] || ''),
       data.ket_qua !== undefined ? String(data.ket_qua) : (cur[10] || ''),
-      data.ghi_chu !== undefined ? String(data.ghi_chu) : (cur[11] || ''),
-      cur[12] || '', cur[13] || '',
-      data.danh_gia !== undefined && String(data.danh_gia) !== '' ? String(data.danh_gia) : (cur[14] || '--')
+      data.ghi_chu !== undefined ? String(data.ghi_chu) : (cur[11] || '')
     ];
 
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `Tasks!A${targetRow}:O${targetRow}`,
+      range: `Tasks!A${targetRow}:L${targetRow}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [updatedRow] }
     });
@@ -809,7 +808,7 @@ async function deleteItem(type, id, data) {
   }
 
   // Default: Tasks
-  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Tasks!A4:O500' });
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Tasks!A4:R500' });
   const rows = res.data.values || [];
   let targetRow = 0;
 
@@ -847,7 +846,8 @@ async function deleteItem(type, id, data) {
   }
 
   if (targetRow >= 4) {
-    await sheets.spreadsheets.values.clear({ spreadsheetId, range: `Tasks!A${targetRow}:O${targetRow}` });
+    // CHỈ xóa dữ liệu trong Cột A đến Cột L, bảo vệ công thức cột M đến R
+    await sheets.spreadsheets.values.clear({ spreadsheetId, range: `Tasks!A${targetRow}:L${targetRow}` });
   }
 
   return { success: true, id, message: 'Deleted task successfully' };
