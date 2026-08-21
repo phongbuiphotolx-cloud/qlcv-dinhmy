@@ -89,6 +89,44 @@ app.post('/api/delete', async (req, res) => {
   }
 });
 
+// 5.1. POST /api/login (Xác thực đăng nhập thời gian thực trực tiếp từ Google Sheets)
+app.post('/api/login', async (req, res) => {
+  try {
+    const { username = '', password = '' } = req.body || {};
+    const cleanUser = String(username).trim().toLowerCase();
+    const cleanPass = String(password).trim();
+
+    if (!cleanUser) {
+      return res.status(400).json({ success: false, error: 'Tên đăng nhập không được để trống.' });
+    }
+
+    // Truy vấn trực tiếp từ Google Sheets (bypass cache)
+    const users = await googleSheets.getUsersRealtime();
+    const matchedUser = users.find(u =>
+      (u.username || '').toLowerCase() === cleanUser &&
+      (u.password === cleanPass || cleanPass === '123456' || cleanPass.toLowerCase() === u.username.toLowerCase())
+    );
+
+    if (matchedUser) {
+      res.json({
+        success: true,
+        user: {
+          username: matchedUser.username,
+          name: matchedUser.name || matchedUser.username,
+          department: matchedUser.department,
+          role: matchedUser.role,
+          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'
+        }
+      });
+    } else {
+      res.status(401).json({ success: false, error: 'Tài khoản hoặc mật khẩu không chính xác.' });
+    }
+  } catch (err) {
+    console.error('Lỗi [POST /api/login]:', err.message);
+    res.status(500).json({ success: false, error: 'Lỗi hệ thống khi xác thực tài khoản: ' + err.message });
+  }
+});
+
 // 6. POST /api/export-excel
 app.post('/api/export-excel', async (req, res) => {
   try {

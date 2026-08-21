@@ -853,11 +853,52 @@ async function deleteItem(type, id, data) {
   return { success: true, id, message: 'Deleted task successfully' };
 }
 
+// ----------------------------------------------------------------------
+// GET USERS REALTIME (Bypass cache, fetch directly from Google Sheets)
+// ----------------------------------------------------------------------
+async function getUsersRealtime() {
+  const spreadsheetId = getSpreadsheetId();
+  if (!spreadsheetId) {
+    console.log('[Google Sheets API] Chưa cấu hình GOOGLE_SHEET_ID. Sử dụng dữ liệu mẫu.');
+    const memData = loadInitialInMemoryData();
+    return memData.users || [];
+  }
+
+  try {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: 'Settings!K4:O500'
+    });
+
+    const rows = res.data.values || [];
+    const users = [];
+    for (let r = 0; r < rows.length; r++) {
+      const row = rows[r] || [];
+      const username = String(row[0] || '').trim();
+      if (username) {
+        users.push({
+          username,
+          password: String(row[1] || ''),
+          department: String(row[2] || ''),
+          role: String(row[3] || ''),
+          name: String(row[4] || '')
+        });
+      }
+    }
+    return users;
+  } catch (err) {
+    console.error('[Google Sheets API getUsersRealtime Lỗi]:', err.message);
+    const memData = loadInitialInMemoryData();
+    return memData.users || [];
+  }
+}
+
 module.exports = {
   getData,
   addItem,
   updateItem,
   deleteItem,
+  getUsersRealtime,
   getSpreadsheetId,
   normalizeEmpStatus,
   SERVICE_ACCOUNT_EMAIL

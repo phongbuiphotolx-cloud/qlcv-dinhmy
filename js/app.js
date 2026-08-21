@@ -85,10 +85,17 @@ function LoginScreen({ onLogin, error, setError }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onLogin(username, password);
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await onLogin(username, password);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -155,10 +162,20 @@ function LoginScreen({ onLogin, error, setError }) {
 
           <button
             type="submit"
-            className="w-full btn-primary h-11 text-sm font-bold shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 mt-2"
+            disabled={isSubmitting}
+            className="w-full btn-primary h-11 text-sm font-bold shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 mt-2 disabled:opacity-60"
           >
-            <i data-lucide="log-in" className="w-4 h-4"></i>
-            <span>Đăng nhập hệ thống</span>
+            {isSubmitting ? (
+              <>
+                <Spinner className="w-4 h-4 text-white" />
+                <span>Đang kết nối kiểm tra...</span>
+              </>
+            ) : (
+              <>
+                <i data-lucide="log-in" className="w-4 h-4"></i>
+                <span>Đăng nhập hệ thống</span>
+              </>
+            )}
           </button>
         </form>
       </div>
@@ -353,38 +370,90 @@ function App() {
     }, 4000);
   };
 
-  // Auth Handlers - dynamically matching against `accounts` state
-  const handleLogin = (usernameInput, passwordInput) => {
+  // Auth Handlers - Real-time authentication directly against Google Sheets
+  const handleLogin = async (usernameInput, passwordInput) => {
     const cleanUser = (usernameInput || '').trim().toLowerCase();
     const cleanPass = (passwordInput || '').trim();
 
-    const matchedUser = accounts.find(u =>
-      (u.username || '').toLowerCase() === cleanUser &&
-      (u.password === cleanPass || cleanPass === '123456' || cleanPass.toLowerCase() === u.username.toLowerCase())
-    );
+    try {
+      // 1. Send real-time login authentication request to backend (bypassing local cache)
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify({ username: cleanUser, password: cleanPass })
+      });
 
-    if (matchedUser) {
-      const sessionUser = {
-        username: matchedUser.username,
-        name: matchedUser.name || matchedUser.username,
-        department: matchedUser.department,
-        role: matchedUser.role,
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'
-      };
+      const data = await res.json().catch(() => ({}));
 
-      const sessionData = {
-        user: sessionUser,
-        loginTime: Date.now(),
-        expiresAt: Date.now() + SESSION_TIMEOUT_MS
-      };
+      if (res.ok && data.success && data.user) {
+        const sessionUser = {
+          username: data.user.username,
+          name: data.user.name || data.user.username,
+          department: data.user.department,
+          role: data.user.role,
+          avatar: data.user.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'
+        };
 
-      localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
-      setUser(sessionUser);
-      setLoginError('');
-      addToast('success', 'Đăng nhập thành công', `Xin chào ${sessionUser.name} (${sessionUser.role} - ${sessionUser.department})`);
-    } else {
-      setLoginError('Tài khoản hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại!');
+        const sessionData = {
+          user: sessionUser,
+          loginTime: Date.now(),
+          expiresAt: Date.now() + SESSION_TIMEOUT_MS
+        };
+
+        localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
+        setUser(sessionUser);
+        setLoginError('');
+        addToast('success', 'Đăng nhập thành công', `Xin chào ${sessionUser.name} (${sessionUser.role} - ${sessionUser.department})`);
+        return;
+      }
+
+      if (data.error) {
+        setLoginError(data.error);
+        return;
+      }
+    } catch (err) {
+      console.warn('Lỗi kết nối /api/login, chuyển sang kiểm tra thời gian thực:', err);
     }
+
+    // Fallback: Real-time query to /api/data?t=timestamp if /api/login endpoint has network error
+    try {
+      const dataRes = await fetch('/api/data?t=' + Date.now());
+      if (dataRes.ok) {
+        const freshData = await dataRes.json();
+        if (freshData.users && Array.isArray(freshData.users)) {
+          setAccounts(freshData.users);
+          const matchedUser = freshData.users.find(u =>
+            (u.username || '').toLowerCase() === cleanUser &&
+            (u.password === cleanPass || cleanPass === '123456' || cleanPass.toLowerCase() === u.username.toLowerCase())
+          );
+          if (matchedUser) {
+            const sessionUser = {
+              username: matchedUser.username,
+              name: matchedUser.name || matchedUser.username,
+              department: matchedUser.department,
+              role: matchedUser.role,
+              avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'
+            };
+
+            const sessionData = {
+              user: sessionUser,
+              loginTime: Date.now(),
+              expiresAt: Date.now() + SESSION_TIMEOUT_MS
+            };
+
+            localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
+            setUser(sessionUser);
+            setLoginError('');
+            addToast('success', 'Đăng nhập thành công', `Xin chào ${sessionUser.name} (${sessionUser.role} - ${sessionUser.department})`);
+            return;
+          }
+        }
+      }
+    } catch (fallbackErr) {
+      console.error('Lỗi kết nối dữ liệu:', fallbackErr);
+    }
+
+    setLoginError('Tài khoản hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại!');
   };
 
   const handleLogout = (isExpired = false) => {
