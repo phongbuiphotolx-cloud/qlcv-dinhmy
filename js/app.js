@@ -423,8 +423,8 @@ function App() {
         if (freshData.users && Array.isArray(freshData.users)) {
           setAccounts(freshData.users);
           const matchedUser = freshData.users.find(u =>
-            (u.username || '').toLowerCase() === cleanUser &&
-            (u.password === cleanPass || cleanPass === '123456' || cleanPass.toLowerCase() === u.username.toLowerCase())
+            (u.username || '').trim().toLowerCase() === cleanUser &&
+            String(u.password || '').trim() === cleanPass
           );
           if (matchedUser) {
             const sessionUser = {

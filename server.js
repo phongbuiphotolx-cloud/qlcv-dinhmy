@@ -100,11 +100,11 @@ app.post('/api/login', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Tên đăng nhập không được để trống.' });
     }
 
-    // Truy vấn trực tiếp từ Google Sheets (bypass cache)
+    // Truy vấn trực tiếp từ Google Sheets (bypass cache, so sánh mật khẩu chính xác 100%)
     const users = await googleSheets.getUsersRealtime();
     const matchedUser = users.find(u =>
-      (u.username || '').toLowerCase() === cleanUser &&
-      (u.password === cleanPass || cleanPass === '123456' || cleanPass.toLowerCase() === u.username.toLowerCase())
+      (u.username || '').trim().toLowerCase() === cleanUser &&
+      String(u.password || '').trim() === cleanPass
     );
 
     if (matchedUser) {
