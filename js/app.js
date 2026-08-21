@@ -5448,9 +5448,9 @@ function CategoriesView({ subTab, categories, setCategories, employees, setEmplo
                 </tr>
               </thead>
               <tbody>
-                {agenciesList.map((item, idx) => (
+                {paginatedAgencies.map((item, idx) => (
                   <tr key={item + idx} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="text-center font-mono font-semibold text-slate-500">{idx + 1}</td>
+                    <td className="text-center font-mono font-semibold text-slate-500">{(agencyCurrentPage - 1) * agencyPageSize + idx + 1}</td>
                     <td className="font-bold text-slate-900">{item}</td>
                     <td className="text-center">
                       <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
@@ -5497,6 +5497,29 @@ function CategoriesView({ subTab, categories, setCategories, employees, setEmplo
                 )}
               </tbody>
             </table>
+
+            {/* Pagination Footer */}
+            <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+              <div className="flex items-center gap-2">
+                <span>Hiển thị</span>
+                <select value={agencyPageSize} onChange={e => { setAgencyPageSize(Number(e.target.value)); setAgencyCurrentPage(1); }} className="form-select h-8 text-xs py-0">
+                  <option value={10}>10 dòng</option>
+                  <option value={25}>25 dòng</option>
+                  <option value={50}>50 dòng</option>
+                </select>
+                <span>/ Tổng {agenciesList.length} dòng</span>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <button disabled={agencyCurrentPage === 1} onClick={() => setAgencyCurrentPage(p => p - 1)} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40">
+                  <i data-lucide="chevron-left" className="w-4 h-4"></i>
+                </button>
+                <span className="px-3 py-1 font-semibold text-slate-700">Trang {agencyCurrentPage} / {agencyTotalPages}</span>
+                <button disabled={agencyCurrentPage >= agencyTotalPages} onClick={() => setAgencyCurrentPage(p => p + 1)} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40">
+                  <i data-lucide="chevron-right" className="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Add Agency Modal */}
