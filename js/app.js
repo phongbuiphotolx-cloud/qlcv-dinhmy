@@ -2015,6 +2015,149 @@ function DateInput({ value, onChange, placeholder = 'dd/mm/yyyy' }) {
 }
 
 // ----------------------------------------------------------------------
+// HELPER: Searchable Select / Dropdown Component
+// ----------------------------------------------------------------------
+function SearchableSelect({
+  options = [],
+  value = '',
+  onChange,
+  placeholder = '-- Chọn hoặc tìm kiếm --',
+  className = '',
+  required = false
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredOptions = useMemo(() => {
+    if (!searchQuery.trim()) return options;
+    const q = searchQuery.trim().toLowerCase();
+    return options.filter(opt => {
+      const labelStr = typeof opt === 'object' ? (opt.label || opt.value || '') : String(opt);
+      const subStr = typeof opt === 'object' ? (opt.subtext || '') : '';
+      return labelStr.toLowerCase().includes(q) || subStr.toLowerCase().includes(q);
+    });
+  }, [options, searchQuery]);
+
+  const selectedDisplay = useMemo(() => {
+    if (!value) return '';
+    const found = options.find(opt => (typeof opt === 'object' ? opt.value : opt) === value);
+    if (found) {
+      return typeof found === 'object' ? (found.label || found.value) : String(found);
+    }
+    return String(value);
+  }, [options, value]);
+
+  const handleSelect = (itemValue) => {
+    onChange(itemValue);
+    setIsOpen(false);
+    setSearchQuery('');
+  };
+
+  return (
+    <div ref={containerRef} className={`relative w-full ${className}`}>
+      <div
+        onClick={() => setIsOpen(prev => !prev)}
+        className={`form-select flex items-center justify-between cursor-pointer bg-white min-h-[38px] py-1.5 px-3 border border-slate-300 rounded-lg text-xs transition-all ${
+          isOpen ? 'ring-2 ring-blue-500 border-blue-500 shadow-sm' : 'hover:border-slate-400'
+        }`}
+      >
+        <span className={value ? 'text-slate-800 font-medium truncate' : 'text-slate-400 font-normal truncate'}>
+          {selectedDisplay || placeholder}
+        </span>
+        <svg className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isOpen ? 'rotate-180 text-blue-600' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+        </svg>
+      </div>
+
+      {isOpen && (
+        <div className="absolute z-50 mt-1 w-full bg-white rounded-xl shadow-xl border border-slate-200 p-2 space-y-1.5 animate-fadeIn max-h-60 flex flex-col">
+          <div className="relative shrink-0">
+            <input
+              type="text"
+              autoFocus
+              placeholder="Gõ từ khóa tìm kiếm..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full pl-8 pr-7 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <svg className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="8" strokeWidth="2"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65" strokeWidth="2"></line>
+            </svg>
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 text-xs px-1"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-y-auto max-h-44 space-y-0.5 custom-scrollbar">
+            {!required && (
+              <div
+                onClick={() => handleSelect('')}
+                className={`px-3 py-1.5 text-xs rounded-lg cursor-pointer transition-colors ${
+                  !value ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                -- Chưa chọn --
+              </div>
+            )}
+
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((opt, idx) => {
+                const itemVal = typeof opt === 'object' ? opt.value : opt;
+                const itemLabel = typeof opt === 'object' ? opt.label : opt;
+                const itemSub = typeof opt === 'object' ? opt.subtext : null;
+                const isSelected = itemVal === value;
+
+                return (
+                  <div
+                    key={itemVal + idx}
+                    onClick={() => handleSelect(itemVal)}
+                    className={`px-3 py-2 text-xs rounded-lg cursor-pointer transition-colors flex items-center justify-between ${
+                      isSelected ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <div>
+                      <div className="font-semibold leading-tight">{itemLabel}</div>
+                      {itemSub && <div className="text-[10px] text-slate-400 font-normal mt-0.5">{itemSub}</div>}
+                    </div>
+                    {isSelected && (
+                      <svg className="w-4 h-4 text-blue-600 shrink-0 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <div className="px-3 py-3 text-xs text-slate-400 text-center font-medium">
+                Không tìm thấy kết quả phù hợp
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------
 // 5. DASHBOARD VIEW COMPONENT
 // ----------------------------------------------------------------------
 function DashboardView({ tasks, filters, setFilters, onOpenDetail, categories }) {
@@ -3333,13 +3476,13 @@ function AddTaskModal({ categories, employees, defaultDepartment = '', onClose, 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Nơi ban hành *</label>
-                <select
+                <SearchableSelect
+                  options={agencyList}
                   value={formData.noi_ban_hanh}
-                  onChange={e => setFormData({ ...formData, noi_ban_hanh: e.target.value })}
-                  className="form-select"
-                >
-                  {agencyList.map(a => <option key={a} value={a}>{a}</option>)}
-                </select>
+                  onChange={val => setFormData({ ...formData, noi_ban_hanh: val })}
+                  placeholder="Chọn hoặc tìm Nơi ban hành..."
+                  required={true}
+                />
               </div>
 
               <div>
@@ -3402,18 +3545,17 @@ function AddTaskModal({ categories, employees, defaultDepartment = '', onClose, 
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Người phụ trách *</label>
-                <select
+                <SearchableSelect
+                  options={filteredEmployees?.map(emp => ({
+                    value: emp.ho_ten,
+                    label: emp.ho_ten,
+                    subtext: emp.chuc_vu ? `${emp.chuc_vu} - ${emp.phong_ban || ''}` : emp.phong_ban
+                  })) || []}
                   value={formData.nguoi_phu_trach}
-                  onChange={e => setFormData({ ...formData, nguoi_phu_trach: e.target.value })}
-                  className="form-select"
-                >
-                  <option value="">-- Chưa phân công --</option>
-                  {filteredEmployees?.map(emp => (
-                    <option key={emp.ma_nv || emp.ho_ten} value={emp.ho_ten}>
-                      {emp.ho_ten} {emp.chuc_vu ? `(${emp.chuc_vu})` : ''}
-                    </option>
-                  ))}
-                </select>
+                  onChange={val => setFormData({ ...formData, nguoi_phu_trach: val })}
+                  placeholder="-- Chọn hoặc tìm Người phụ trách --"
+                  required={false}
+                />
               </div>
             </div>
 
@@ -3583,13 +3725,13 @@ function EditTaskModal({ task, categories, employees, onClose, onSubmit }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Nơi ban hành *</label>
-                <select
+                <SearchableSelect
+                  options={agencyList}
                   value={formData.noi_ban_hanh}
-                  onChange={e => setFormData({ ...formData, noi_ban_hanh: e.target.value })}
-                  className="form-select"
-                >
-                  {agencyList.map(a => <option key={a} value={a}>{a}</option>)}
-                </select>
+                  onChange={val => setFormData({ ...formData, noi_ban_hanh: val })}
+                  placeholder="Chọn hoặc tìm Nơi ban hành..."
+                  required={true}
+                />
               </div>
 
               <div>
@@ -3655,18 +3797,17 @@ function EditTaskModal({ task, categories, employees, onClose, onSubmit }) {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Người phụ trách *</label>
-                <select
+                <SearchableSelect
+                  options={filteredEmployees?.map(emp => ({
+                    value: emp.ho_ten,
+                    label: emp.ho_ten,
+                    subtext: emp.chuc_vu ? `${emp.chuc_vu} - ${emp.phong_ban || ''}` : emp.phong_ban
+                  })) || []}
                   value={formData.nguoi_phu_trach}
-                  onChange={e => setFormData({ ...formData, nguoi_phu_trach: e.target.value })}
-                  className="form-select"
-                >
-                  <option value="">-- Chưa phân công --</option>
-                  {filteredEmployees?.map(emp => (
-                    <option key={emp.ma_nv || emp.ho_ten} value={emp.ho_ten}>
-                      {emp.ho_ten} {emp.chuc_vu ? `(${emp.chuc_vu})` : ''}
-                    </option>
-                  ))}
-                </select>
+                  onChange={val => setFormData({ ...formData, nguoi_phu_trach: val })}
+                  placeholder="-- Chọn hoặc tìm Người phụ trách --"
+                  required={false}
+                />
               </div>
             </div>
 
