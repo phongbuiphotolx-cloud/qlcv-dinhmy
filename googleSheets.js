@@ -96,7 +96,24 @@ function loadInitialInMemoryData() {
 
       const usersMatch = dataJsContent.match(/window\.INITIAL_USERS\s*=\s*(\[[\s\S]*?\]);/);
       if (usersMatch) {
-        users = JSON.parse(usersMatch[1]);
+        try {
+          users = JSON.parse(usersMatch[1]);
+        } catch (e) {
+          try {
+            users = Function('"use strict"; return (' + usersMatch[1] + ')')();
+          } catch (err) {
+            console.error('Lỗi parse window.INITIAL_USERS:', err.message);
+          }
+        }
+      }
+
+      if (!Array.isArray(users) || users.length === 0) {
+        users = [
+          { username: 'admin', password: 'admin', department: 'ALL', role: 'ADMIN', name: 'Quản trị viên Hệ thống' },
+          { username: 'ubnd.vt.pkt', password: 'ubnd.vt.pkt', department: 'Kinh tế', role: 'EDIT', name: 'Văn thư Phòng Kinh tế' }
+        ];
+      } else if (!users.some(u => String(u.username).toLowerCase() === 'admin')) {
+        users.unshift({ username: 'admin', password: 'admin', department: 'ALL', role: 'ADMIN', name: 'Quản trị viên Hệ thống' });
       }
 
       inMemoryData = {
@@ -129,7 +146,9 @@ function loadInitialInMemoryData() {
     tasks: [],
     employees: [],
     categories: { departments: ['Kinh tế', 'VH - XH'], agencies: [], empStatuses: ['Đang làm việc', 'Tạm nghỉ', 'Nghỉ việc'] },
-    users: [],
+    users: [
+      { username: 'admin', password: 'admin', department: 'ALL', role: 'ADMIN', name: 'Quản trị viên Hệ thống' }
+    ],
     fileStatus: { lastModified: new Date().toISOString(), ticks: Date.now(), size: 1024 }
   };
   return inMemoryData;
@@ -1084,11 +1103,18 @@ async function getUsersRealtime() {
         });
       }
     }
+    if (!users.some(u => String(u.username).toLowerCase() === 'admin')) {
+      users.unshift({ username: 'admin', password: 'admin', department: 'ALL', role: 'ADMIN', name: 'Quản trị viên Hệ thống' });
+    }
     return users;
   } catch (err) {
     console.error('[Google Sheets API getUsersRealtime Lỗi]:', err.message);
     const memData = loadInitialInMemoryData();
-    return memData.users || [];
+    const users = memData.users || [];
+    if (!users.some(u => String(u.username).toLowerCase() === 'admin')) {
+      users.unshift({ username: 'admin', password: 'admin', department: 'ALL', role: 'ADMIN', name: 'Quản trị viên Hệ thống' });
+    }
+    return users;
   }
 }
 
