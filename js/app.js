@@ -3029,21 +3029,23 @@ function TasksView({
             </select>
           </div>
 
-          {/* Col 4: Người phụ trách (Dependent Dropdown filtered by Department) */}
+          {/* Col 4: Người phụ trách (Searchable Dropdown) */}
           <div>
             <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Người phụ trách</label>
-            <select
+            <SearchableSelect
+              options={[
+                { value: '', label: '-- Tất cả --' },
+                ...(filteredEmployees?.map(e => ({
+                  value: e.ho_ten,
+                  label: e.ho_ten,
+                  subtext: e.chuc_vu ? `${e.chuc_vu} - ${e.phong_ban || ''}` : e.phong_ban
+                })) || [])
+              ]}
               value={draftFilters.assignee}
-              onChange={e => setDraftFilters({ ...draftFilters, assignee: e.target.value })}
-              className="form-select w-full"
-            >
-              <option value="">-- Tất cả --</option>
-              {filteredEmployees?.map(e => (
-                <option key={e.ma_nv || e.ho_ten} value={e.ho_ten}>
-                  {e.ho_ten} {e.chuc_vu ? `(${e.chuc_vu})` : ''}
-                </option>
-              ))}
-            </select>
+              onChange={val => setDraftFilters({ ...draftFilters, assignee: val })}
+              placeholder="-- Tất cả --"
+              required={true}
+            />
           </div>
 
           {/* Col 5: Row 1 Actions (Tìm kiếm & Đặt lại) */}
@@ -4878,21 +4880,23 @@ function KPIView({ tasks = [], employees = [], categories = {}, user, addToast }
             </select>
           </div>
 
-          {/* Employee Filter */}
+          {/* Employee Filter (Searchable Dropdown) */}
           <div className="lg:col-span-3">
             <label className="block font-semibold text-slate-700 mb-1">Lọc theo Công chức</label>
-            <select
+            <SearchableSelect
+              options={[
+                { value: '', label: '-- Tất cả công chức --' },
+                ...(filteredEmployeesForDropdown?.map(emp => ({
+                  value: emp.ho_ten,
+                  label: emp.ho_ten,
+                  subtext: emp.chuc_vu ? `${emp.chuc_vu} - ${emp.phong_ban || ''}` : emp.phong_ban
+                })) || [])
+              ]}
               value={selectedEmpName}
-              onChange={e => setSelectedEmpName(e.target.value)}
-              className="form-select w-full"
-            >
-              <option value="">-- Tất cả công chức --</option>
-              {filteredEmployeesForDropdown.map(emp => (
-                <option key={emp.ma_nv || emp.ho_ten} value={emp.ho_ten}>
-                  {emp.ho_ten} {emp.phong_ban ? `(${emp.phong_ban})` : ''}
-                </option>
-              ))}
-            </select>
+              onChange={val => setSelectedEmpName(val)}
+              placeholder="-- Tất cả công chức --"
+              required={true}
+            />
           </div>
 
           {/* Month Filter */}
