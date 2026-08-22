@@ -61,6 +61,8 @@ function isEmployeeActive(emp) {
     return false;
   }
   return true;
+}
+
 // Helper to check if a task can be deleted based on status and user role
 function canDeleteTask(task, isAdmin) {
   if (!task) return false;
