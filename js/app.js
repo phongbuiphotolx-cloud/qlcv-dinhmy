@@ -2726,6 +2726,7 @@ function TasksView({
           'Mô tả / Nội dung': task.mo_ta || '',
           'Phòng ban': task.phong_ban || '',
           'Người phụ trách': task.nguoi_phu_trach || '',
+          'Đơn vị / Người phối hợp': task.don_vi_phoi_hop || '',
           'Ngày tạo': formatDate(task.ngay_tao),
           'Deadline': formatDate(task.deadline),
           'Ngày hoàn thành': formatDate(task.ngay_hoan_thanh),
@@ -2987,9 +2988,10 @@ function TasksView({
                   </th>
                 )}
                 <th className="w-10 text-center px-1">STT</th>
-                <th className="w-28 text-left px-1.5">Số công văn</th>
-                <th className="text-left px-2">Tên công việc</th>
+                <th className="w-24 text-left px-1.5">Số công văn</th>
+                <th className="text-left px-2 min-w-[160px]">Tên công việc</th>
                 <th className="w-28 text-left px-1.5">Người phụ trách</th>
+                <th className="w-32 text-left px-1.5">Đơn vị / Người phối hợp</th>
                 <th className="w-24 text-center px-1">Deadline</th>
                 <th className="w-24 text-center px-1">Ngày hoàn thành</th>
                 <th className="w-24 text-center px-1">Trạng thái</th>
@@ -3036,6 +3038,11 @@ function TasksView({
                     </div>
                     <div className="font-bold text-slate-800 text-xs mt-0.5 truncate" title={task.nguoi_phu_trach}>
                       {task.nguoi_phu_trach || 'Chưa phân công'}
+                    </div>
+                  </td>
+                  <td className="align-top text-xs px-1.5 py-2.5 w-32">
+                    <div className="text-xs font-medium text-slate-700 leading-snug line-clamp-2" title={task.don_vi_phoi_hop}>
+                      {task.don_vi_phoi_hop || '--'}
                     </div>
                   </td>
                   <td className="text-xs font-mono align-top text-center py-2.5 px-1 w-24 whitespace-nowrap">{formatDate(task.deadline)}</td>
@@ -3227,6 +3234,7 @@ function AddTaskModal({ categories, employees, defaultDepartment = '', onClose, 
       mo_ta: '',
       phong_ban: initialDept,
       nguoi_phu_trach: '',
+      don_vi_phoi_hop: '',
       ngay_tao: formatDate(new Date()),
       deadline: '',
       ket_qua: ''
@@ -3359,6 +3367,17 @@ function AddTaskModal({ categories, employees, defaultDepartment = '', onClose, 
               </div>
             </div>
 
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Đơn vị / Người phối hợp</label>
+              <input
+                type="text"
+                placeholder="Ví dụ: Phòng VH-XH, Chi cục Thủy lợi, Nguyễn Văn A..."
+                value={formData.don_vi_phoi_hop}
+                onChange={e => setFormData({ ...formData, don_vi_phoi_hop: e.target.value })}
+                className="form-input"
+              />
+            </div>
+
             {/* Grid 3: Ngày tạo & Deadline */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -3457,6 +3476,7 @@ function EditTaskModal({ task, categories, employees, onClose, onSubmit }) {
     mo_ta: task.mo_ta || '',
     phong_ban: task.phong_ban || departmentList[0] || 'Phòng Kinh tế',
     nguoi_phu_trach: task.nguoi_phu_trach || '',
+    don_vi_phoi_hop: task.don_vi_phoi_hop || '',
     ngay_tao: formatDate(task.ngay_tao) !== '--' ? formatDate(task.ngay_tao) : (task.ngay_tao || ''),
     deadline: formatDate(task.deadline) !== '--' ? formatDate(task.deadline) : (task.deadline || ''),
     ngay_hoan_thanh: formatDate(task.ngay_hoan_thanh) !== '--' ? formatDate(task.ngay_hoan_thanh) : (task.ngay_hoan_thanh || ''),
@@ -3600,6 +3620,17 @@ function EditTaskModal({ task, categories, employees, onClose, onSubmit }) {
               </div>
             </div>
 
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Đơn vị / Người phối hợp</label>
+              <input
+                type="text"
+                placeholder="Ví dụ: Phòng VH-XH, Chi cục Thủy lợi, Nguyễn Văn A..."
+                value={formData.don_vi_phoi_hop}
+                onChange={e => setFormData({ ...formData, don_vi_phoi_hop: e.target.value })}
+                className="form-input"
+              />
+            </div>
+
             {/* Grid 3: Ngày tạo & Deadline */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -3711,7 +3742,11 @@ function TaskDetailModal({ task, isViewOnly, onClose, onOpenEditTask }) {
             </div>
             <div>
               <span className="block text-slate-400 uppercase font-semibold">Người phụ trách</span>
-              <span className="font-medium text-slate-800">{task.nguoi_phu_trach}</span>
+              <span className="font-medium text-slate-800">{task.nguoi_phu_trach || '--'}</span>
+            </div>
+            <div>
+              <span className="block text-slate-400 uppercase font-semibold">Đơn vị / Người phối hợp</span>
+              <span className="font-medium text-slate-800">{task.don_vi_phoi_hop || '--'}</span>
             </div>
             <div>
               <span className="block text-slate-400 uppercase font-semibold">Trạng thái</span>
@@ -4560,6 +4595,7 @@ function KPIView({ tasks = [], employees = [], categories = {}, user, addToast }
           'Tên công việc': task.ten_cong_viec || '',
           'Phòng ban': task.phong_ban || '',
           'Người phụ trách': task.nguoi_phu_trach || '',
+          'Đơn vị / Người phối hợp': task.don_vi_phoi_hop || '',
           'Ngày tạo': formatDate(task.ngay_tao),
           'Deadline': formatDate(task.deadline),
           'Ngày hoàn thành': formatDate(task.ngay_hoan_thanh),

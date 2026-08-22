@@ -400,7 +400,7 @@ async function getData() {
 
     const res = await sheets.spreadsheets.values.batchGet({
       spreadsheetId,
-      ranges: ['Tasks!A1:R500', 'Employees!A1:E500', 'Settings!A1:O500']
+      ranges: ['Tasks!A1:T500', 'Employees!A1:E500', 'Settings!A1:O500']
     });
 
     const valueRanges = res.data.valueRanges || [];
@@ -447,7 +447,8 @@ async function getData() {
           trang_thai: row[9],
           deadline: row[7],
           ngay_hoan_thanh: row[8]
-        })
+        }),
+        don_vi_phoi_hop: String(row[19] || '')
       });
     }
 
@@ -664,6 +665,15 @@ async function addItem(type, data) {
     requestBody: { values: [newRowValues] }
   });
 
+  if (data.don_vi_phoi_hop !== undefined) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `Tasks!T${targetRow}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [[String(data.don_vi_phoi_hop || '')]] }
+    });
+  }
+
   return { success: true, id: targetRow - 3, excel_row: targetRow, message: 'Added task successfully' };
 }
 
@@ -857,6 +867,16 @@ async function updateItem(type, data) {
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [updatedRow] }
     });
+
+    if (data.don_vi_phoi_hop !== undefined) {
+      const coorValue = String(data.don_vi_phoi_hop || '');
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `Tasks!T${targetRow}`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: [[coorValue]] }
+      });
+    }
   }
 
   return { success: true, id: data.id, excel_row: targetRow, message: 'Updated task successfully' };

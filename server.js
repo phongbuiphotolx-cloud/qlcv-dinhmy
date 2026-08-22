@@ -141,6 +141,7 @@ app.post('/api/export-excel', async (req, res) => {
       'Mô tả': task.mo_ta || '',
       'Phòng ban': task.phong_ban || '',
       'Người phụ trách': task.nguoi_phu_trach || '',
+      'Đơn vị / Người phối hợp': task.don_vi_phoi_hop || '',
       'Ngày tạo': task.ngay_tao || '',
       'Deadline': task.deadline || '',
       'Ngày hoàn thành': task.ngay_hoan_thanh || '',
@@ -160,6 +161,7 @@ app.post('/api/export-excel', async (req, res) => {
       { wch: 35 }, // Mô tả
       { wch: 18 }, // Phòng ban
       { wch: 22 }, // Người phụ trách
+      { wch: 25 }, // Đơn vị / Người phối hợp
       { wch: 14 }, // Ngày tạo
       { wch: 14 }, // Deadline
       { wch: 16 }, // Ngày hoàn thành
