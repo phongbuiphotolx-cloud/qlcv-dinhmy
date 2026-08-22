@@ -3156,12 +3156,12 @@ function TasksView({
 
       {/* DESKTOP TABLE VIEW */}
       <div className="hidden md:block bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="custom-table w-full">
+        <div className="overflow-x-auto custom-scrollbar">
+          <table className="custom-table w-full min-w-[1050px]">
             <thead>
               <tr>
                 {!isViewOnly && (
-                  <th className="w-8 text-center px-1">
+                  <th className="w-9 text-center px-1">
                     <input
                       type="checkbox"
                       checked={selectedTaskIds.length > 0 && selectedTaskIds.length === paginatedTasks.length}
@@ -3170,23 +3170,23 @@ function TasksView({
                     />
                   </th>
                 )}
-                <th className="w-7 text-center px-0.5">STT</th>
-                <th className="w-20 text-left px-1 break-words">Số công văn</th>
-                <th className="text-left px-1.5 min-w-[120px]">Tên công việc</th>
-                <th className="w-22 text-left px-1 break-words">Người phụ trách</th>
-                <th className="w-24 text-left px-1 break-words">Đơn vị / Người phối hợp</th>
-                <th className="w-18 text-center px-0.5 break-words">Deadline</th>
-                <th className="w-18 text-center px-0.5 break-words">Ngày hoàn thành</th>
-                <th className="w-20 text-center px-0.5 break-words">Trạng thái</th>
-                <th className="w-16 text-center px-0.5 break-words">Đánh giá</th>
-                <th className="w-20 text-center px-0.5">Thao tác</th>
+                <th className="w-10 text-center px-1">STT</th>
+                <th className="w-28 text-left px-2 break-words">Số công văn</th>
+                <th className="text-left px-2 min-w-[200px]">Tên công việc</th>
+                <th className="w-32 text-left px-2 break-words">Người phụ trách</th>
+                <th className="w-36 text-left px-2 break-words">Đơn vị / Người phối hợp</th>
+                <th className="w-24 text-center px-1.5 whitespace-nowrap">Deadline</th>
+                <th className="w-28 text-center px-1.5 whitespace-nowrap">Ngày hoàn thành</th>
+                <th className="w-28 text-center px-1.5 whitespace-nowrap">Trạng thái</th>
+                <th className="w-24 text-center px-1.5 whitespace-nowrap">Đánh giá</th>
+                <th className="w-24 text-center px-1">Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {paginatedTasks.map((task, idx) => (
                 <tr key={task.id} className={selectedTaskIds.includes(task.id) ? 'bg-blue-50/50' : ''}>
                   {!isViewOnly && (
-                    <td className="text-center px-0.5">
+                    <td className="text-center px-1">
                       <input
                         type="checkbox"
                         checked={selectedTaskIds.includes(task.id)}
@@ -3195,8 +3195,8 @@ function TasksView({
                       />
                     </td>
                   )}
-                  <td className="text-slate-400 font-mono text-[11px] text-center px-0.5">{(currentPage - 1) * pageSize + idx + 1}</td>
-                  <td className="align-top text-xs px-1 py-1.5 w-20">
+                  <td className="text-slate-400 font-mono text-[11px] text-center px-1">{(currentPage - 1) * pageSize + idx + 1}</td>
+                  <td className="align-top text-xs px-2 py-2 w-28">
                     <div
                       className={`font-bold cursor-pointer hover:underline leading-tight break-words ${
                         isTaskOverdue(task) ? 'text-rose-600 font-extrabold' : 'text-blue-600'
@@ -3210,12 +3210,12 @@ function TasksView({
                       {task.noi_ban_hanh || 'UBND tỉnh'}
                     </div>
                   </td>
-                  <td className="align-top py-1.5 px-1.5 text-xs font-medium text-slate-900 cursor-pointer hover:text-blue-600" onClick={() => onOpenDetail(task)}>
+                  <td className="align-top py-2 px-2 text-xs font-medium text-slate-900 cursor-pointer hover:text-blue-600 min-w-[200px]" onClick={() => onOpenDetail(task)}>
                     <div className="line-clamp-2 leading-snug" title={task.ten_cong_viec}>
                       {task.ten_cong_viec}
                     </div>
                   </td>
-                  <td className="align-top text-xs px-1 py-1.5 w-22">
+                  <td className="align-top text-xs px-2 py-2 w-32">
                     <div className="text-[10px] text-slate-400 font-normal truncate" title={task.phong_ban}>
                       {task.phong_ban || 'Kinh tế'}
                     </div>
@@ -3223,16 +3223,16 @@ function TasksView({
                       {task.nguoi_phu_trach || 'Chưa phân công'}
                     </div>
                   </td>
-                  <td className="align-top text-xs px-1 py-1.5 w-24">
+                  <td className="align-top text-xs px-2 py-2 w-36">
                     <div className="text-xs font-medium text-slate-700 leading-tight line-clamp-2" title={task.don_vi_phoi_hop || ''}>
                       {task.don_vi_phoi_hop && task.don_vi_phoi_hop !== '--' ? task.don_vi_phoi_hop : ''}
                     </div>
                   </td>
-                  <td className="text-[11px] font-mono align-top text-center py-1.5 px-0.5 w-18 whitespace-nowrap">{formatDate(task.deadline) !== '--' ? formatDate(task.deadline) : ''}</td>
-                  <td className="text-[11px] font-mono align-top text-center py-1.5 px-0.5 w-18 whitespace-nowrap">{formatDate(task.ngay_hoan_thanh) !== '--' ? formatDate(task.ngay_hoan_thanh) : ''}</td>
-                  <td className="align-top text-center py-1.5 px-0.5 w-20 whitespace-nowrap"><StatusBadge status={task.trang_thai} /></td>
-                  <td className="align-top text-center py-1.5 px-0.5 w-16 whitespace-nowrap"><RatingBadge task={task} rating={calculateEvaluation(task)} /></td>
-                  <td className="align-top text-center py-1.5 px-0.5 w-20 whitespace-nowrap">
+                  <td className="text-[11px] font-mono align-top text-center py-2 px-1.5 w-24 whitespace-nowrap">{formatDate(task.deadline) !== '--' ? formatDate(task.deadline) : ''}</td>
+                  <td className="text-[11px] font-mono align-top text-center py-2 px-1.5 w-28 whitespace-nowrap">{formatDate(task.ngay_hoan_thanh) !== '--' ? formatDate(task.ngay_hoan_thanh) : ''}</td>
+                  <td className="align-top text-center py-2 px-1.5 w-28 whitespace-nowrap"><StatusBadge status={task.trang_thai} /></td>
+                  <td className="align-top text-center py-2 px-1.5 w-24 whitespace-nowrap"><RatingBadge task={task} rating={calculateEvaluation(task)} /></td>
+                  <td className="align-top text-center py-2 px-1 w-24 whitespace-nowrap">
                     <div className="flex items-center justify-center gap-1.5 opacity-100 visible">
                       <button
                         type="button"
@@ -3337,11 +3337,17 @@ function TasksView({
             <div className="grid grid-cols-2 gap-2 text-xs text-slate-500 pt-2 border-t border-slate-100">
               <div>
                 <span className="block text-[10px] text-slate-400 uppercase font-semibold">Người phụ trách</span>
-                <span className="font-medium text-slate-700">{task.nguoi_phu_trach}</span>
+                <span className="font-medium text-slate-700">{task.nguoi_phu_trach || 'Chưa phân công'}</span>
               </div>
               <div>
-                <span className="block text-[10px] text-slate-400 uppercase font-semibold">Deadline</span>
-                <span className="font-mono text-slate-700">{formatDate(task.deadline)}</span>
+                <span className="block text-[10px] text-slate-400 uppercase font-semibold">
+                  {formatDate(task.ngay_hoan_thanh) !== '--' ? 'Deadline / Hoàn thành' : 'Deadline'}
+                </span>
+                <span className="font-mono text-slate-700">
+                  {formatDate(task.ngay_hoan_thanh) !== '--'
+                    ? `${formatDate(task.deadline)} (Hoàn thành: ${formatDate(task.ngay_hoan_thanh)})`
+                    : formatDate(task.deadline)}
+                </span>
               </div>
             </div>
 
