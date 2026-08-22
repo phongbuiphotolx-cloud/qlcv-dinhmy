@@ -79,8 +79,22 @@ app.post('/api/update', async (req, res) => {
 // 5. POST /api/delete
 app.post('/api/delete', async (req, res) => {
   try {
-    const { type = 'tasks', id, data } = req.body || {};
+    const { type = 'tasks', id, data, userRole, userDepartment } = req.body || {};
     const targetId = id || data?.id;
+
+    if (type === 'tasks') {
+      const currentData = await googleSheets.getData();
+      const targetTask = (currentData.tasks || []).find(t => String(t.id) === String(targetId)) || data;
+      const isUserAdmin = userRole === 'ADMIN' || userRole === 'ALL' || userDepartment === 'ALL';
+
+      if (targetTask && targetTask.trang_thai === 'Hoàn thành' && !isUserAdmin) {
+        return res.status(403).json({
+          success: false,
+          error: 'Từ chối truy cập: Chỉ tài khoản Quản trị tối cao (Admin / quyền ALL) mới có quyền xóa công việc đã hoàn thành!'
+        });
+      }
+    }
+
     const result = await googleSheets.deleteItem(type, targetId, data);
     res.json(result);
   } catch (err) {

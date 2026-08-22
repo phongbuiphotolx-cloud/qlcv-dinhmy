@@ -61,6 +61,13 @@ function isEmployeeActive(emp) {
     return false;
   }
   return true;
+// Helper to check if a task can be deleted based on status and user role
+function canDeleteTask(task, isAdmin) {
+  if (!task) return false;
+  if (task.trang_thai === 'Hoàn thành') {
+    return Boolean(isAdmin);
+  }
+  return true;
 }
 
 // Deterministic Task Array Sorting Utility (Ensures ID descending stability across all state updates)
@@ -647,6 +654,11 @@ function App() {
     const target = tasks.find(t => t.id === taskId);
     if (!target) return;
 
+    if (target.trang_thai === 'Hoàn thành' && !isAdmin) {
+      addToast('danger', 'Từ chối truy cập', 'Công việc đã hoàn thành: Chỉ tài khoản Quản trị tối cao (Admin / quyền ALL) mới có quyền xóa!');
+      return;
+    }
+
     setTasks(prev => sortTasksDeterministically(prev.filter(t => t.id !== taskId)));
     setModals(prev => ({ ...prev, confirmDelete: null }));
     addToast('success', 'Đã xóa', `Đã xóa công việc #${taskId}`);
@@ -656,9 +668,19 @@ function App() {
       const res = await fetch('/api/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json; charset=utf-8' },
-        body: JSON.stringify({ type: 'tasks', id: taskId, data: target })
+        body: JSON.stringify({
+          type: 'tasks',
+          id: taskId,
+          data: target,
+          userRole: user?.role,
+          userDepartment: user?.department
+        })
       });
-      if (res.ok) {
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        addToast('danger', 'Từ chối truy cập', errData.error || 'API từ chối quyền xóa công việc đã hoàn thành!');
+        await refreshDataFromBackend();
+      } else {
         await refreshDataFromBackend();
       }
     } catch (e) {
@@ -668,10 +690,16 @@ function App() {
     }
   };
 
-
-
   const handleRequestBulkDelete = () => {
     if (isViewOnly || selectedTaskIds.length === 0) return;
+    if (!isAdmin) {
+      const selectedTasks = tasks.filter(t => selectedTaskIds.includes(t.id));
+      const hasCompleted = selectedTasks.some(t => t.trang_thai === 'Hoàn thành');
+      if (hasCompleted) {
+        addToast('danger', 'Từ chối truy cập', 'Danh sách đã chọn chứa công việc đã hoàn thành. Chỉ Admin mới có quyền xóa công việc đã hoàn thành!');
+        return;
+      }
+    }
     setModals(prev => ({ ...prev, confirmBulkDelete: true }));
   };
 
@@ -679,17 +707,22 @@ function App() {
     if (isViewOnly || selectedTaskIds.length === 0) return;
     setModals(prev => ({ ...prev, confirmBulkDelete: false }));
 
-    const selectedTasks = tasks.filter(t => selectedTaskIds.includes(t.id));
+    let selectedTasks = tasks.filter(t => selectedTaskIds.includes(t.id));
+    if (!isAdmin) {
+      selectedTasks = selectedTasks.filter(t => t.trang_thai !== 'Hoàn thành');
+    }
     const count = selectedTasks.length;
-    if (count === 0) return;
+    if (count === 0) {
+      addToast('warning', 'Thông báo', 'Không có công việc nào hợp lệ để xóa.');
+      return;
+    }
 
-    // 1. Instant Optimistic UI Update (0ms Latency)
-    setTasks(prev => sortTasksDeterministically(prev.filter(t => !selectedTaskIds.includes(t.id))));
+    const idsToDelete = selectedTasks.map(t => t.id);
+    setTasks(prev => sortTasksDeterministically(prev.filter(t => !idsToDelete.includes(t.id))));
     setSelectedTaskIds([]);
     addToast('success', 'Đã xóa hàng loạt', `Đã xóa thành công ${count} công việc khỏi Google Sheets!`);
     setIsSyncing(true);
 
-    // 2. Background Async Google Sheets API Call
     try {
       await Promise.all(selectedTasks.map(task =>
         fetch('/api/delete', {
@@ -698,7 +731,9 @@ function App() {
           body: JSON.stringify({
             type: 'tasks',
             id: task.id,
-            data: { id: task.id, excel_row: task.excel_row, so_cong_van: task.so_cong_van }
+            data: { id: task.id, excel_row: task.excel_row, so_cong_van: task.so_cong_van },
+            userRole: user?.role,
+            userDepartment: user?.department
           })
         })
       ));
@@ -3075,17 +3110,31 @@ function TasksView({
                               <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
                             </svg>
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => onConfirmDelete(task.id)}
-                            className="p-1.5 rounded-lg text-rose-600 hover:text-rose-700 hover:bg-rose-100/80 bg-rose-50 border border-rose-200/70 transition-colors inline-flex items-center justify-center cursor-pointer shadow-2xs"
-                            title="Xóa công việc"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="3 6 5 6 21 6"></polyline>
-                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                            </svg>
-                          </button>
+                          {canDeleteTask(task, isAdmin) ? (
+                            <button
+                              type="button"
+                              onClick={() => onConfirmDelete(task.id)}
+                              className="p-1.5 rounded-lg text-rose-600 hover:text-rose-700 hover:bg-rose-100/80 bg-rose-50 border border-rose-200/70 transition-colors inline-flex items-center justify-center cursor-pointer shadow-2xs"
+                              title="Xóa công việc"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                              </svg>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled
+                              className="p-1.5 rounded-lg text-slate-300 bg-slate-100 border border-slate-200 cursor-not-allowed opacity-40 inline-flex items-center justify-center"
+                              title="Công việc đã hoàn thành: Chỉ Admin mới có quyền xóa"
+                            >
+                              <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                              </svg>
+                            </button>
+                          )}
                         </>
                       )}
                     </div>
