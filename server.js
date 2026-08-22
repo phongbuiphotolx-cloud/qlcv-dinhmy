@@ -144,6 +144,7 @@ app.post('/api/add', async (req, res) => {
   try {
     const { type = 'tasks', data } = req.body || {};
     const result = await googleSheets.addItem(type, data);
+    googleSheets.clearDataCache();
     res.json(result);
   } catch (err) {
     console.error('Lỗi [POST /api/add]:', err.message);
@@ -156,6 +157,7 @@ app.post('/api/update', async (req, res) => {
   try {
     const { type = 'tasks', data } = req.body || {};
     const result = await googleSheets.updateItem(type, data);
+    googleSheets.clearDataCache();
     res.json(result);
   } catch (err) {
     console.error('Lỗi [POST /api/update]:', err.message);
@@ -183,6 +185,7 @@ app.post('/api/delete', async (req, res) => {
     }
 
     const result = await googleSheets.deleteItem(type, targetId, data);
+    googleSheets.clearDataCache();
     res.json(result);
   } catch (err) {
     console.error('Lỗi [POST /api/delete]:', err.message);

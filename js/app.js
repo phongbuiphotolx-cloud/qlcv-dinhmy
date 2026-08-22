@@ -303,24 +303,25 @@ function App() {
     }
   };
 
-  // Fetch real-time data from Google Sheets Backend Server on mount
-  const refreshDataFromBackend = async () => {
+  // Fetch real-time data from Google Sheets Backend Server on mount or mutation
+  const refreshDataFromBackend = async (forceRefresh = false) => {
     setIsSyncing(true);
     try {
-      const res = await fetch('/api/data');
+      const url = forceRefresh ? '/api/data?refresh=true&t=' + Date.now() : '/api/data?t=' + Date.now();
+      const res = await fetch(url);
       if (res.ok) {
         setDbConnected(true);
         const data = await res.json();
-        if (data.tasks && Array.isArray(data.tasks) && data.tasks.length > 0) {
+        if (data.tasks && Array.isArray(data.tasks)) {
           setTasks(sortTasksDeterministically(data.tasks));
         }
-        if (data.employees && Array.isArray(data.employees) && data.employees.length > 0) {
+        if (data.employees && Array.isArray(data.employees)) {
           setEmployees(data.employees);
         }
         if (data.categories && typeof data.categories === 'object') {
-          setCategories(prev => ({ ...prev, ...data.categories }));
+          setCategories(data.categories);
         }
-        if (data.users && Array.isArray(data.users) && data.users.length > 0) {
+        if (data.users && Array.isArray(data.users)) {
           setAccounts(data.users);
         }
       } else {
@@ -588,7 +589,7 @@ function App() {
         if (data.fileStatus && data.fileStatus.ticks) {
           lastSyncedTicksRef.current = data.fileStatus.ticks;
         }
-        await refreshDataFromBackend();
+        await refreshDataFromBackend(true);
       }
     } catch (e) {
       console.error('Background sync add error:', e);
@@ -631,18 +632,18 @@ function App() {
         if (data.fileStatus && data.fileStatus.ticks) {
           lastSyncedTicksRef.current = data.fileStatus.ticks;
         }
-        await refreshDataFromBackend();
+        await refreshDataFromBackend(true);
       } else {
         const errData = await res.json().catch(() => ({}));
         const errMsg = errData.error || `HTTP status ${res.status}`;
         console.error('Update API returned error status:', res.status, errMsg);
         addToast('danger', 'Lỗi cập nhật Excel', `Không thể lưu vào Excel: ${errMsg}`);
-        await refreshDataFromBackend();
+        await refreshDataFromBackend(true);
       }
     } catch (e) {
       console.error('Background sync update error:', e);
       addToast('danger', 'Lỗi kết nối', 'Không thể kết nối đến server backend local!');
-      await refreshDataFromBackend();
+      await refreshDataFromBackend(true);
     } finally {
       setIsSyncing(false);
     }
@@ -4161,8 +4162,9 @@ function EmployeesView({ employees, setEmployees, categories, onRefresh, addToas
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         if (addToast) addToast('danger', 'Lỗi ghi dữ liệu Google Sheets', errData.error || 'Không thể lưu công chức vào Google Sheets!');
-      } else if (onRefresh) {
-        onRefresh();
+      }
+      if (onRefresh) {
+        await onRefresh(true);
       }
     } catch (err) {
       console.error('Error adding employee:', err);
@@ -5739,8 +5741,8 @@ function CategoriesView({ subTab, categories, setCategories, employees, setEmplo
         headers: { 'Content-Type': 'application/json; charset=utf-8' },
         body: JSON.stringify({ type: 'agencies', data: { name } })
       });
-      if (res.ok && onRefresh) {
-        await onRefresh();
+      if (onRefresh) {
+        await onRefresh(true);
       }
     } catch (err) {
       console.error('Error adding agency:', err);
@@ -5772,8 +5774,8 @@ function CategoriesView({ subTab, categories, setCategories, employees, setEmplo
         headers: { 'Content-Type': 'application/json; charset=utf-8' },
         body: JSON.stringify({ type: 'agencies', data: { oldName, newName } })
       });
-      if (res.ok && onRefresh) {
-        await onRefresh();
+      if (onRefresh) {
+        await onRefresh(true);
       }
     } catch (err) {
       console.error('Error updating agency:', err);
@@ -5797,8 +5799,8 @@ function CategoriesView({ subTab, categories, setCategories, employees, setEmplo
         headers: { 'Content-Type': 'application/json; charset=utf-8' },
         body: JSON.stringify({ type: 'agencies', id: agencyToDelete, data: { name: agencyToDelete } })
       });
-      if (res.ok && onRefresh) {
-        await onRefresh();
+      if (onRefresh) {
+        await onRefresh(true);
       }
     } catch (err) {
       console.error('Error deleting agency:', err);
@@ -6185,8 +6187,10 @@ function SettingsView({ user, setUser, accounts, setAccounts, addToast }) {
       } else {
         addToast('success', 'Thêm tài khoản thành công', `Tài khoản ${newAcc.username} đã tạo trên giao diện!`);
       }
+      if (onRefresh) await onRefresh(true);
     } catch (err) {
       addToast('success', 'Thêm tài khoản thành công', `Tài khoản ${newAcc.username} đã tạo trên giao diện!`);
+      if (onRefresh) await onRefresh(true);
     }
   };
 
@@ -6216,8 +6220,10 @@ function SettingsView({ user, setUser, accounts, setAccounts, addToast }) {
       } else {
         addToast('success', 'Lưu thay đổi', `Đã cập nhật thông tin tài khoản ${editingAccount.username}!`);
       }
+      if (onRefresh) await onRefresh(true);
     } catch (err) {
       addToast('success', 'Lưu thay đổi', `Đã cập nhật thông tin tài khoản ${editingAccount.username}!`);
+      if (onRefresh) await onRefresh(true);
     }
   };
 
@@ -6239,8 +6245,10 @@ function SettingsView({ user, setUser, accounts, setAccounts, addToast }) {
         } else {
           addToast('success', 'Đã xóa tài khoản', `Đã xóa tài khoản ${accUsername} khỏi hệ thống!`);
         }
+        if (onRefresh) await onRefresh(true);
       } catch (err) {
         addToast('success', 'Đã xóa tài khoản', `Đã xóa tài khoản ${accUsername} khỏi hệ thống!`);
+        if (onRefresh) await onRefresh(true);
       }
     }
   };

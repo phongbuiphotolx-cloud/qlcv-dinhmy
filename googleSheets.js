@@ -593,6 +593,7 @@ async function addItem(type, data) {
       requestBody: { values: [[deptName]] }
     });
 
+    clearDataCache();
     return { success: true, name: deptName, excel_row: targetRow, message: 'Added department successfully' };
   }
 
@@ -612,6 +613,7 @@ async function addItem(type, data) {
       requestBody: { values: [[agencyName]] }
     });
 
+    clearDataCache();
     return { success: true, name: agencyName, excel_row: targetRow, message: 'Added agency successfully' };
   }
 
@@ -643,6 +645,7 @@ async function addItem(type, data) {
       requestBody: { values: [[ma_nv, ho_ten, phong_ban, chuc_vu, cleanSt]] }
     });
 
+    clearDataCache();
     return { success: true, ma_nv, excel_row: targetRow, message: 'Added employee successfully' };
   }
 
@@ -663,6 +666,7 @@ async function addItem(type, data) {
       }
     });
 
+    clearDataCache();
     return { success: true, username: data.username, message: 'Added user successfully' };
   }
 
@@ -741,6 +745,7 @@ async function updateItem(type, data) {
         }
       }
     }
+    clearDataCache();
     return { success: true, oldName, newName, message: 'Updated department successfully' };
   }
 
@@ -764,6 +769,7 @@ async function updateItem(type, data) {
         }
       }
     }
+    clearDataCache();
     return { success: true, oldName, newName, message: 'Updated agency successfully' };
   }
 
@@ -797,6 +803,7 @@ async function updateItem(type, data) {
       requestBody: { values: [[targetMaNV, ho_ten, phong_ban, chuc_vu, cleanSt]] }
     });
 
+    clearDataCache();
     return { success: true, ma_nv: targetMaNV, excel_row: targetRow, message: 'Updated employee successfully' };
   }
 
@@ -827,6 +834,7 @@ async function updateItem(type, data) {
         }
       }
     }
+    clearDataCache();
     return { success: true, username: data.username, message: 'Updated user successfully' };
   }
 
@@ -937,6 +945,7 @@ async function deleteItem(type, id, data) {
         }
       }
     }
+    clearDataCache();
     return { success: true, name: targetName, message: 'Deleted department successfully' };
   }
 
@@ -953,6 +962,7 @@ async function deleteItem(type, id, data) {
         }
       }
     }
+    clearDataCache();
     return { success: true, name: targetName, message: 'Deleted agency successfully' };
   }
 
@@ -974,6 +984,7 @@ async function deleteItem(type, id, data) {
     if (!targetRow) throw new Error(`Không tìm thấy công chức Mã NV '${targetMaNV}' để xóa!`);
 
     await deleteSheetRow(spreadsheetId, 'Employees', targetRow);
+    clearDataCache();
     return { success: true, ma_nv: targetMaNV, excel_row: targetRow, message: 'Deleted employee successfully' };
   }
 
@@ -990,6 +1001,7 @@ async function deleteItem(type, id, data) {
         }
       }
     }
+    clearDataCache();
     return { success: true, id, message: 'Deleted user successfully' };
   }
 
