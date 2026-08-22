@@ -2457,8 +2457,16 @@ function DashboardView({ tasks, filters, setFilters, onOpenDetail, categories })
                   <td className="align-top whitespace-nowrap"><StatusBadge status={task.trang_thai} /></td>
                   <td className="align-top whitespace-nowrap"><RatingBadge task={task} rating={calculateEvaluation(task)} /></td>
                   <td className="align-top whitespace-nowrap text-center">
-                    <button onClick={() => onOpenDetail(task)} className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors" title="Xem chi tiết">
-                      <i data-lucide="eye" className="w-4 h-4"></i>
+                    <button
+                      type="button"
+                      onClick={() => onOpenDetail(task)}
+                      className="p-1.5 rounded-lg text-blue-600 hover:text-blue-700 hover:bg-blue-100/80 bg-blue-50 border border-blue-200/70 transition-colors inline-flex items-center justify-center cursor-pointer shadow-2xs"
+                      title="Xem chi tiết"
+                    >
+                      <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
                     </button>
                   </td>
                 </tr>
@@ -2986,7 +2994,7 @@ function TasksView({
                 <th className="w-24 text-center px-1">Ngày hoàn thành</th>
                 <th className="w-24 text-center px-1">Trạng thái</th>
                 <th className="w-20 text-center px-1">Đánh giá</th>
-                <th className="w-20 text-center px-1">Thao tác</th>
+                <th className="w-28 text-center px-1">Thao tác</th>
               </tr>
             </thead>
             <tbody>
@@ -3034,18 +3042,42 @@ function TasksView({
                   <td className="text-xs font-mono align-top text-center py-2.5 px-1 w-24 whitespace-nowrap">{formatDate(task.ngay_hoan_thanh)}</td>
                   <td className="align-top text-center py-2.5 px-1 w-24 whitespace-nowrap"><StatusBadge status={task.trang_thai} /></td>
                   <td className="align-top text-center py-2.5 px-1 w-20 whitespace-nowrap"><RatingBadge task={task} rating={calculateEvaluation(task)} /></td>
-                  <td className="align-top text-center py-2.5 px-1 w-20 whitespace-nowrap">
-                    <div className="flex items-center justify-center gap-0.5">
-                      <button onClick={() => onOpenDetail(task)} className="p-1 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded" title="Xem chi tiết">
-                        <i data-lucide="eye" className="w-3.5 h-3.5"></i>
+                  <td className="align-top text-center py-2.5 px-1 w-28 whitespace-nowrap">
+                    <div className="flex items-center justify-center gap-1.5 opacity-100 visible">
+                      <button
+                        type="button"
+                        onClick={() => onOpenDetail(task)}
+                        className="p-1.5 rounded-lg text-slate-700 hover:text-blue-600 hover:bg-slate-200/80 bg-slate-100 border border-slate-200 transition-colors inline-flex items-center justify-center cursor-pointer shadow-2xs"
+                        title="Xem chi tiết"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                          <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
                       </button>
                       {!isViewOnly && (
                         <>
-                          <button onClick={() => onOpenEditTask(task)} className="p-1 text-blue-600 hover:bg-blue-50 rounded" title="Chỉnh sửa thông tin công việc">
-                            <i data-lucide="edit-3" className="w-3.5 h-3.5"></i>
+                          <button
+                            type="button"
+                            onClick={() => onOpenEditTask(task)}
+                            className="p-1.5 rounded-lg text-blue-600 hover:text-blue-700 hover:bg-blue-100/80 bg-blue-50 border border-blue-200/70 transition-colors inline-flex items-center justify-center cursor-pointer shadow-2xs"
+                            title="Chỉnh sửa thông tin công việc"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M12 20h9"></path>
+                              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                            </svg>
                           </button>
-                          <button onClick={() => onConfirmDelete(task.id)} className="p-1 text-rose-500 hover:bg-rose-50 rounded" title="Xóa">
-                            <i data-lucide="trash-2" className="w-3.5 h-3.5"></i>
+                          <button
+                            type="button"
+                            onClick={() => onConfirmDelete(task.id)}
+                            className="p-1.5 rounded-lg text-rose-600 hover:text-rose-700 hover:bg-rose-100/80 bg-rose-50 border border-rose-200/70 transition-colors inline-flex items-center justify-center cursor-pointer shadow-2xs"
+                            title="Xóa công việc"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="3 6 5 6 21 6"></polyline>
+                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
                           </button>
                         </>
                       )}
@@ -6056,21 +6088,29 @@ function SettingsView({ user, setUser, accounts, setAccounts, addToast }) {
                   </td>
                   <td className="text-xs text-slate-700">{acc.name || '--'}</td>
                   <td className="text-center">
-                    <div className="flex items-center justify-center gap-1">
+                    <div className="flex items-center justify-center gap-1.5 opacity-100 visible">
                       <button
+                        type="button"
                         onClick={() => setEditingAccount({ ...acc })}
-                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg"
+                        className="p-1.5 rounded-lg text-blue-600 hover:text-blue-700 hover:bg-blue-100/80 bg-blue-50 border border-blue-200/70 transition-colors inline-flex items-center justify-center cursor-pointer shadow-2xs"
                         title="Chỉnh sửa tài khoản"
                       >
-                        <i data-lucide="edit-3" className="w-4 h-4"></i>
+                        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 20h9"></path>
+                          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                        </svg>
                       </button>
                       {acc.username !== 'admin' && (
                         <button
+                          type="button"
                           onClick={() => handleDeleteAccount(acc.username)}
-                          className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg"
+                          className="p-1.5 rounded-lg text-rose-600 hover:text-rose-700 hover:bg-rose-100/80 bg-rose-50 border border-rose-200/70 transition-colors inline-flex items-center justify-center cursor-pointer shadow-2xs"
                           title="Xóa tài khoản"
                         >
-                          <i data-lucide="trash-2" className="w-4 h-4"></i>
+                          <svg className="w-4 h-4 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                          </svg>
                         </button>
                       )}
                     </div>
