@@ -2987,23 +2987,23 @@ function TasksView({
                     />
                   </th>
                 )}
-                <th className="w-10 text-center px-1">STT</th>
-                <th className="w-24 text-left px-1.5">Số công văn</th>
-                <th className="text-left px-2 min-w-[160px]">Tên công việc</th>
-                <th className="w-28 text-left px-1.5">Người phụ trách</th>
-                <th className="w-32 text-left px-1.5">Đơn vị / Người phối hợp</th>
-                <th className="w-24 text-center px-1">Deadline</th>
-                <th className="w-24 text-center px-1">Ngày hoàn thành</th>
-                <th className="w-24 text-center px-1">Trạng thái</th>
-                <th className="w-20 text-center px-1">Đánh giá</th>
-                <th className="w-28 text-center px-1">Thao tác</th>
+                <th className="w-8 text-center px-0.5">STT</th>
+                <th className="w-20 text-left px-1 whitespace-normal leading-tight">Số công văn</th>
+                <th className="text-left px-1.5 min-w-[130px]">Tên công việc</th>
+                <th className="w-24 text-left px-1 whitespace-normal leading-tight">Người phụ trách</th>
+                <th className="w-24 text-left px-1 whitespace-normal leading-tight">Đơn vị / Người phối hợp</th>
+                <th className="w-20 text-center px-0.5 whitespace-normal leading-tight">Deadline</th>
+                <th className="w-20 text-center px-0.5 whitespace-normal leading-tight">Ngày hoàn thành</th>
+                <th className="w-20 text-center px-0.5 whitespace-normal leading-tight">Trạng thái</th>
+                <th className="w-16 text-center px-0.5 whitespace-normal leading-tight">Đánh giá</th>
+                <th className="w-24 text-center px-0.5">Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {paginatedTasks.map((task, idx) => (
                 <tr key={task.id} className={selectedTaskIds.includes(task.id) ? 'bg-blue-50/50' : ''}>
                   {!isViewOnly && (
-                    <td className="text-center px-1">
+                    <td className="text-center px-0.5">
                       <input
                         type="checkbox"
                         checked={selectedTaskIds.includes(task.id)}
@@ -3012,8 +3012,8 @@ function TasksView({
                       />
                     </td>
                   )}
-                  <td className="text-slate-400 font-mono text-xs text-center px-1">{(currentPage - 1) * pageSize + idx + 1}</td>
-                  <td className="align-top text-xs px-1.5 py-2.5 w-28">
+                  <td className="text-slate-400 font-mono text-xs text-center px-0.5">{(currentPage - 1) * pageSize + idx + 1}</td>
+                  <td className="align-top text-xs px-1 py-2 w-20">
                     <div
                       className={`font-bold cursor-pointer hover:underline leading-tight break-words ${
                         isTaskOverdue(task) ? 'text-rose-600 font-extrabold' : 'text-blue-600'
@@ -3023,33 +3023,33 @@ function TasksView({
                     >
                       {task.so_cong_van || '--'}
                     </div>
-                    <div className="text-[11px] text-slate-400 font-normal mt-0.5 truncate" title={task.noi_ban_hanh}>
+                    <div className="text-[10px] text-slate-400 font-normal mt-0.5 truncate" title={task.noi_ban_hanh}>
                       {task.noi_ban_hanh || 'UBND tỉnh'}
                     </div>
                   </td>
-                  <td className="align-top py-2.5 px-2 text-xs font-medium text-slate-900 cursor-pointer hover:text-blue-600" onClick={() => onOpenDetail(task)}>
+                  <td className="align-top py-2 px-1.5 text-xs font-medium text-slate-900 cursor-pointer hover:text-blue-600" onClick={() => onOpenDetail(task)}>
                     <div className="line-clamp-2 leading-snug" title={task.ten_cong_viec}>
                       {task.ten_cong_viec}
                     </div>
                   </td>
-                  <td className="align-top text-xs px-1.5 py-2.5 w-28">
-                    <div className="text-[11px] text-slate-400 font-normal truncate" title={task.phong_ban}>
+                  <td className="align-top text-xs px-1 py-2 w-24">
+                    <div className="text-[10px] text-slate-400 font-normal truncate" title={task.phong_ban}>
                       {task.phong_ban || 'Kinh tế'}
                     </div>
                     <div className="font-bold text-slate-800 text-xs mt-0.5 truncate" title={task.nguoi_phu_trach}>
                       {task.nguoi_phu_trach || 'Chưa phân công'}
                     </div>
                   </td>
-                  <td className="align-top text-xs px-1.5 py-2.5 w-32">
-                    <div className="text-xs font-medium text-slate-700 leading-snug line-clamp-2" title={task.don_vi_phoi_hop}>
+                  <td className="align-top text-xs px-1 py-2 w-24">
+                    <div className="text-xs font-medium text-slate-700 leading-tight line-clamp-2" title={task.don_vi_phoi_hop}>
                       {task.don_vi_phoi_hop || '--'}
                     </div>
                   </td>
-                  <td className="text-xs font-mono align-top text-center py-2.5 px-1 w-24 whitespace-nowrap">{formatDate(task.deadline)}</td>
-                  <td className="text-xs font-mono align-top text-center py-2.5 px-1 w-24 whitespace-nowrap">{formatDate(task.ngay_hoan_thanh)}</td>
-                  <td className="align-top text-center py-2.5 px-1 w-24 whitespace-nowrap"><StatusBadge status={task.trang_thai} /></td>
-                  <td className="align-top text-center py-2.5 px-1 w-20 whitespace-nowrap"><RatingBadge task={task} rating={calculateEvaluation(task)} /></td>
-                  <td className="align-top text-center py-2.5 px-1 w-28 whitespace-nowrap">
+                  <td className="text-[11px] font-mono align-top text-center py-2 px-0.5 w-20 whitespace-nowrap">{formatDate(task.deadline)}</td>
+                  <td className="text-[11px] font-mono align-top text-center py-2 px-0.5 w-20 whitespace-nowrap">{formatDate(task.ngay_hoan_thanh)}</td>
+                  <td className="align-top text-center py-2 px-0.5 w-20 whitespace-nowrap"><StatusBadge status={task.trang_thai} /></td>
+                  <td className="align-top text-center py-2 px-0.5 w-16 whitespace-nowrap"><RatingBadge task={task} rating={calculateEvaluation(task)} /></td>
+                  <td className="align-top text-center py-2 px-0.5 w-24 whitespace-nowrap">
                     <div className="flex items-center justify-center gap-1.5 opacity-100 visible">
                       <button
                         type="button"

@@ -332,7 +332,7 @@ async function initializeDefaultHeadersAndSeed(spreadsheetId) {
   const memData = loadInitialInMemoryData();
 
   const taskRows = [
-    ['Nơi ban hành', 'Số công văn', 'Tên công việc', 'Mô tả', 'Phòng ban', 'Người phụ trách', 'Ngày tạo', 'Deadline', 'Ngày hoàn thành', 'Trạng thái', 'Kết quả', 'Ghi chú', 'Số ngày còn lại', 'Số ngày trễ', 'Đánh giá']
+    ['Nơi ban hành', 'Số công văn', 'Tên công việc', 'Mô tả', 'Phòng ban', 'Người phụ trách', 'Ngày tạo', 'Deadline', 'Ngày hoàn thành', 'Trạng thái', 'Kết quả', 'Ghi chú', 'Số ngày còn lại', 'Số ngày trễ', 'Đánh giá', 'Tuần', 'Tháng', 'Năm', '', 'Đơn vị/Người phối hợp']
   ];
 
   (memData.tasks || []).forEach(t => {
@@ -340,7 +340,7 @@ async function initializeDefaultHeadersAndSeed(spreadsheetId) {
       t.noi_ban_hanh || '', t.so_cong_van || '', t.ten_cong_viec || '', t.mo_ta || '',
       t.phong_ban || '', t.nguoi_phu_trach || '', t.ngay_tao || '', t.deadline || '',
       t.ngay_hoan_thanh || '', t.trang_thai || '', t.ket_qua || '', t.ghi_chu || '',
-      t.so_ngay_con_lai || '', t.so_ngay_tre || '', t.danh_gia || ''
+      t.so_ngay_con_lai || '', t.so_ngay_tre || '', t.danh_gia || '', t.tuan || '', t.thang || '', t.nam || '', '', t.don_vi_phoi_hop || ''
     ]);
   });
 
@@ -376,7 +376,7 @@ async function initializeDefaultHeadersAndSeed(spreadsheetId) {
     requestBody: {
       valueInputOption: 'USER_ENTERED',
       data: [
-        { range: 'Tasks!A3:O' + (taskRows.length + 2), values: taskRows },
+        { range: 'Tasks!A3:T' + (taskRows.length + 2), values: taskRows },
         { range: 'Employees!A3:E' + (empRows.length + 2), values: empRows },
         { range: 'Settings!A3:O' + (setRows.length + 2), values: setRows }
       ]
@@ -806,7 +806,7 @@ async function updateItem(type, data) {
   }
 
   // Default: Tasks
-  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Tasks!A4:R500' });
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Tasks!A4:T500' });
   const rows = res.data.values || [];
   let targetRow = 0;
 
