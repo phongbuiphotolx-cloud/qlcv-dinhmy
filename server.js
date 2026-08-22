@@ -147,7 +147,7 @@ app.post('/api/export-excel', async (req, res) => {
       'Trạng thái': task.trang_thai || '',
       'Kết quả': task.ket_qua || '',
       'Ghi chú': task.ghi_chu || '',
-      'Đánh giá': task.danh_gia || ''
+      'Đánh giá': googleSheets.calculateEvaluation ? googleSheets.calculateEvaluation(task) : (task.danh_gia || '')
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(excelRows);

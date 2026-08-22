@@ -135,6 +135,98 @@ function loadInitialInMemoryData() {
   return inMemoryData;
 }
 
+// Helper date parser to UTC timestamp for midnight
+function parseDateToTimestamp(dateVal) {
+  if (dateVal === null || dateVal === undefined) return 0;
+  const rawStr = String(dateVal).trim();
+  if (rawStr === '' || rawStr === '--' || rawStr.toLowerCase() === 'khong' || rawStr.toLowerCase() === 'n/a') return 0;
+
+  const num = Number(rawStr);
+  if (!isNaN(num) && num > 1000 && num < 100000) {
+    const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+    return excelEpoch.getTime() + Math.floor(num) * 86400000;
+  }
+
+  if (/^\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{4}$/.test(rawStr)) {
+    const parts = rawStr.split(/[\/\.-]/);
+    const p1 = parseInt(parts[0], 10);
+    const p2 = parseInt(parts[1], 10);
+    const year = parseInt(parts[2], 10);
+    let day, month;
+    if (p2 > 12) {
+      month = p1 - 1;
+      day = p2;
+    } else {
+      day = p1;
+      month = p2 - 1;
+    }
+    return Date.UTC(year, month, day);
+  }
+
+  if (/^\d{4}[\/\.-]\d{1,2}[\/\.-]\d{1,2}/.test(rawStr)) {
+    const dateOnly = rawStr.split('T')[0];
+    const parts = dateOnly.split(/[\/\.-]/);
+    if (parts.length >= 3) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      return Date.UTC(year, month, day);
+    }
+  }
+
+  const parsedDate = new Date(rawStr);
+  if (!isNaN(parsedDate.getTime())) {
+    return Date.UTC(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate());
+  }
+
+  return 0;
+}
+
+function getMidnightTimestamp(dateVal) {
+  if (!dateVal) {
+    const now = new Date();
+    return Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  }
+  if (dateVal instanceof Date) {
+    return Date.UTC(dateVal.getFullYear(), dateVal.getMonth(), dateVal.getDate());
+  }
+  return parseDateToTimestamp(dateVal);
+}
+
+function calculateEvaluation(task, refDate) {
+  if (!task) return '';
+  const status = String(task.trang_thai || '').trim();
+  const lowerStatus = status.toLowerCase();
+
+  // Tạm dừng hoặc Hủy / Đã hủy -> Cột đánh giá để trống
+  if (lowerStatus === 'tạm dừng' || lowerStatus === 'hủy' || lowerStatus === 'đã hủy' || lowerStatus.includes('tạm dừng') || lowerStatus.includes('hủy')) {
+    return '';
+  }
+
+  const tDeadline = parseDateToTimestamp(task.deadline);
+
+  // Đang thực hiện (hoặc status bao gồm đang thực hiện / quá hạn)
+  if (lowerStatus === 'đang thực hiện' || lowerStatus.includes('đang thực hiện') || lowerStatus === 'quá hạn') {
+    if (!tDeadline) return '';
+    const tCurrent = getMidnightTimestamp(refDate);
+    if (tDeadline < tCurrent) return 'Trễ hạn';
+    if (tDeadline === tCurrent) return 'Đến hạn';
+    return '';
+  }
+
+  // Hoàn thành
+  if (lowerStatus === 'hoàn thành' || lowerStatus.includes('hoàn thành')) {
+    const tHoanThanh = parseDateToTimestamp(task.ngay_hoan_thanh);
+    if (!tDeadline || !tHoanThanh) return '';
+    if (tDeadline > tHoanThanh) return 'Trước hạn';
+    if (tDeadline === tHoanThanh) return 'Đúng hạn';
+    if (tDeadline < tHoanThanh) return 'Trễ hạn';
+    return '';
+  }
+
+  return '';
+}
+
 // Chuẩn hóa trạng thái công chức
 function normalizeEmpStatus(rawStatus) {
   if (!rawStatus) return 'Đang làm việc';
@@ -351,7 +443,11 @@ async function getData() {
         ghi_chu: String(row[11] || ''),
         so_ngay_con_lai: String(row[12] || ''),
         so_ngay_tre: String(row[13] || ''),
-        danh_gia: String(row[14] || '')
+        danh_gia: calculateEvaluation({
+          trang_thai: row[9],
+          deadline: row[7],
+          ngay_hoan_thanh: row[8]
+        })
       });
     }
 
@@ -945,5 +1041,8 @@ module.exports = {
   getUsersRealtime,
   getSpreadsheetId,
   normalizeEmpStatus,
+  calculateEvaluation,
+  parseDateToTimestamp,
+  getMidnightTimestamp,
   SERVICE_ACCOUNT_EMAIL
 };

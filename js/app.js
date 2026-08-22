@@ -557,7 +557,7 @@ function App() {
       ghi_chu: '',
       so_ngay_con_lai: '',
       so_ngay_tre: '',
-      danh_gia: newTaskData.danh_gia || '--',
+      danh_gia: calculateEvaluation(newTaskData),
       tuan: 23,
       thang: 6,
       nam: 2026
@@ -731,7 +731,7 @@ function App() {
           ...t,
           trang_thai: 'Hoàn thành',
           ngay_hoan_thanh: todayFormatted,
-          danh_gia: (t.danh_gia && t.danh_gia !== '--') ? t.danh_gia : 'Tốt'
+          danh_gia: calculateEvaluation({ ...t, trang_thai: 'Hoàn thành', ngay_hoan_thanh: todayFormatted })
         };
       }
       return t;
@@ -747,7 +747,7 @@ function App() {
           ...task,
           trang_thai: 'Hoàn thành',
           ngay_hoan_thanh: todayFormatted,
-          danh_gia: (task.danh_gia && task.danh_gia !== '--') ? task.danh_gia : 'Tốt'
+          danh_gia: calculateEvaluation({ ...task, trang_thai: 'Hoàn thành', ngay_hoan_thanh: todayFormatted })
         };
         return fetch('/api/update', {
           method: 'POST',
@@ -1790,23 +1790,73 @@ function parseMonthYear(dateVal, fallbackMonth = null, fallbackYear = null) {
   };
 }
 
+function getMidnightTimestamp(dateVal) {
+  if (!dateVal) {
+    const now = new Date();
+    return Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  }
+  if (dateVal instanceof Date) {
+    return Date.UTC(dateVal.getFullYear(), dateVal.getMonth(), dateVal.getDate());
+  }
+  return parseDateToTimestamp(dateVal);
+}
+
+// Helper function to calculate evaluation dynamically based on status, deadline, completion date, and current date
+function calculateEvaluation(task, refDate) {
+  if (!task) return '';
+  const status = String(task.trang_thai || '').trim();
+  const lowerStatus = status.toLowerCase();
+
+  // 1. Tạm dừng hoặc Hủy / Đã hủy -> Cột đánh giá để trống
+  if (lowerStatus === 'tạm dừng' || lowerStatus === 'hủy' || lowerStatus === 'đã hủy' || lowerStatus.includes('tạm dừng') || lowerStatus.includes('hủy')) {
+    return '';
+  }
+
+  const tDeadline = parseDateToTimestamp(task.deadline);
+
+  // 2. Đang thực hiện (hoặc status bao gồm đang thực hiện / quá hạn)
+  if (lowerStatus === 'đang thực hiện' || lowerStatus.includes('đang thực hiện') || lowerStatus === 'quá hạn') {
+    if (!tDeadline) return '';
+    const tCurrent = getMidnightTimestamp(refDate);
+    if (tDeadline < tCurrent) return 'Trễ hạn';
+    if (tDeadline === tCurrent) return 'Đến hạn';
+    return '';
+  }
+
+  // 3. Hoàn thành
+  if (lowerStatus === 'hoàn thành' || lowerStatus.includes('hoàn thành')) {
+    const tHoanThanh = parseDateToTimestamp(task.ngay_hoan_thanh);
+    if (!tDeadline || !tHoanThanh) return '';
+    if (tDeadline > tHoanThanh) return 'Trước hạn';
+    if (tDeadline === tHoanThanh) return 'Đúng hạn';
+    if (tDeadline < tHoanThanh) return 'Trễ hạn';
+    return '';
+  }
+
+  return '';
+}
+
 // Helper function to check if a task is overdue based on evaluation (danh_gia) or status
 function isTaskOverdue(task) {
   if (!task) return false;
 
-  // 1. Check danh_gia field ("Trễ hạn", "Hoàn Thành Trễ hạn", etc.)
+  // 1. Check dynamic evaluation result
+  const evalResult = calculateEvaluation(task);
+  if (evalResult === 'Trễ hạn') return true;
+
+  // 2. Check danh_gia field if present ("Trễ hạn", "Hoàn Thành Trễ hạn", etc.)
   if (task.danh_gia && typeof task.danh_gia === 'string') {
     const dg = task.danh_gia.toLowerCase().trim();
     if (dg.includes('trễ') || dg.includes('quá hạn') || dg.includes('overdue')) return true;
   }
 
-  // 2. Check trang_thai field ("Trễ hạn", "Quá hạn")
+  // 3. Check trang_thai field ("Trễ hạn", "Quá hạn")
   if (task.trang_thai && typeof task.trang_thai === 'string') {
     const tt = task.trang_thai.toLowerCase().trim();
     if (tt.includes('trễ') || tt.includes('quá hạn')) return true;
   }
 
-  // 3. Check so_ngay_tre field
+  // 4. Check so_ngay_tre field
   if (task.so_ngay_tre) {
     const tre = Number(task.so_ngay_tre);
     if (!isNaN(tre) && tre > 0) return true;
@@ -2405,7 +2455,7 @@ function DashboardView({ tasks, filters, setFilters, onOpenDetail, categories })
                   <td className="align-top whitespace-nowrap text-xs text-slate-600">{formatDate(task.ngay_tao)}</td>
                   <td className="align-top whitespace-nowrap text-xs text-slate-600">{formatDate(task.deadline)}</td>
                   <td className="align-top whitespace-nowrap"><StatusBadge status={task.trang_thai} /></td>
-                  <td className="align-top whitespace-nowrap"><RatingBadge rating={task.danh_gia} /></td>
+                  <td className="align-top whitespace-nowrap"><RatingBadge task={task} rating={calculateEvaluation(task)} /></td>
                   <td className="align-top whitespace-nowrap text-center">
                     <button onClick={() => onOpenDetail(task)} className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors" title="Xem chi tiết">
                       <i data-lucide="eye" className="w-4 h-4"></i>
@@ -2600,7 +2650,8 @@ function TasksView({
 
       // 7. Đánh giá
       if (activeFilters.rating && activeFilters.rating.trim() !== '') {
-        if (!task.danh_gia || task.danh_gia.trim() !== activeFilters.rating.trim()) return false;
+        const evalVal = calculateEvaluation(task);
+        if (evalVal !== activeFilters.rating.trim()) return false;
       }
 
       return true;
@@ -2673,7 +2724,7 @@ function TasksView({
           'Trạng thái': task.trang_thai || '',
           'Kết quả': task.ket_qua || '',
           'Ghi chú': task.ghi_chu || '',
-          'Đánh giá': task.danh_gia || ''
+          'Đánh giá': calculateEvaluation(task)
         }));
 
         const worksheet = window.XLSX.utils.json_to_sheet(excelRows);
@@ -2851,8 +2902,9 @@ function TasksView({
               className="form-select w-full"
             >
               <option value="">-- Tất cả --</option>
-              <option value="Tốt">Tốt</option>
-              <option value="Hoàn Thành Trễ hạn">Hoàn Thành Trễ hạn</option>
+              <option value="Trước hạn">Trước hạn</option>
+              <option value="Đúng hạn">Đúng hạn</option>
+              <option value="Đến hạn">Đến hạn</option>
               <option value="Trễ hạn">Trễ hạn</option>
             </select>
           </div>
@@ -2981,7 +3033,7 @@ function TasksView({
                   <td className="text-xs font-mono align-top text-center py-2.5 px-1 w-24 whitespace-nowrap">{formatDate(task.deadline)}</td>
                   <td className="text-xs font-mono align-top text-center py-2.5 px-1 w-24 whitespace-nowrap">{formatDate(task.ngay_hoan_thanh)}</td>
                   <td className="align-top text-center py-2.5 px-1 w-24 whitespace-nowrap"><StatusBadge status={task.trang_thai} /></td>
-                  <td className="align-top text-center py-2.5 px-1 w-20 whitespace-nowrap"><RatingBadge rating={task.danh_gia} /></td>
+                  <td className="align-top text-center py-2.5 px-1 w-20 whitespace-nowrap"><RatingBadge task={task} rating={calculateEvaluation(task)} /></td>
                   <td className="align-top text-center py-2.5 px-1 w-20 whitespace-nowrap">
                     <div className="flex items-center justify-center gap-0.5">
                       <button onClick={() => onOpenDetail(task)} className="p-1 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded" title="Xem chi tiết">
@@ -3066,7 +3118,7 @@ function TasksView({
             </div>
 
             <div className="flex items-center justify-between pt-1">
-              <RatingBadge rating={task.danh_gia} />
+              <RatingBadge task={task} rating={calculateEvaluation(task)} />
               <div className="flex items-center gap-2">
                 <button onClick={() => onOpenDetail(task)} className="btn-secondary h-8 px-2.5 text-xs">Chi tiết</button>
                 {!isViewOnly && (
@@ -3097,11 +3149,16 @@ function StatusBadge({ status }) {
   return <span className="badge badge-canceled"><span className="badge-dot"></span>{status}</span>;
 }
 
-function RatingBadge({ rating }) {
-  if (rating === 'Tốt') return <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">Tốt</span>;
-  if (rating === 'Hoàn Thành Trễ hạn') return <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded">Trễ hạn (Xong)</span>;
-  if (rating === 'Trễ hạn') return <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded">Trễ hạn</span>;
-  return <span className="text-xs text-slate-400">--</span>;
+function RatingBadge({ rating, task }) {
+  const evalVal = task ? calculateEvaluation(task) : (rating || '');
+  if (evalVal === 'Trước hạn') return <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">Trước hạn</span>;
+  if (evalVal === 'Đúng hạn') return <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">Đúng hạn</span>;
+  if (evalVal === 'Đến hạn') return <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded">Đến hạn</span>;
+  if (evalVal === 'Trễ hạn') return <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded">Trễ hạn</span>;
+  if (evalVal === 'Tốt') return <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">Trước hạn</span>;
+  if (evalVal === 'Hoàn Thành Trễ hạn') return <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded">Trễ hạn</span>;
+  if (!evalVal || evalVal === '--') return <span className="text-xs text-slate-400">--</span>;
+  return <span className="text-xs text-slate-400">{evalVal}</span>;
 }
 
 // ----------------------------------------------------------------------
@@ -4475,7 +4532,7 @@ function KPIView({ tasks = [], employees = [], categories = {}, user, addToast }
           'Deadline': formatDate(task.deadline),
           'Ngày hoàn thành': formatDate(task.ngay_hoan_thanh),
           'Trạng thái': task.trang_thai || '',
-          'Đánh giá': task.danh_gia || ''
+          'Đánh giá': calculateEvaluation(task)
         }));
 
         const worksheet = window.XLSX.utils.json_to_sheet(excelRows);
