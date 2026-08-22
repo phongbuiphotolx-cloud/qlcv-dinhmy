@@ -3228,8 +3228,8 @@ function TasksView({
                       {task.don_vi_phoi_hop && task.don_vi_phoi_hop !== '--' ? task.don_vi_phoi_hop : ''}
                     </div>
                   </td>
-                  <td className="text-[11px] font-mono align-top text-center py-2 px-1.5 w-24 whitespace-nowrap">{formatDate(task.deadline) !== '--' ? formatDate(task.deadline) : ''}</td>
-                  <td className="text-[11px] font-mono align-top text-center py-2 px-1.5 w-28 whitespace-nowrap">{formatDate(task.ngay_hoan_thanh) !== '--' ? formatDate(task.ngay_hoan_thanh) : ''}</td>
+                  <td className="text-xs font-medium text-slate-800 align-top text-center py-2 px-1.5 w-24 whitespace-nowrap">{formatDate(task.deadline) !== '--' ? formatDate(task.deadline) : ''}</td>
+                  <td className="text-xs font-medium text-slate-800 align-top text-center py-2 px-1.5 w-28 whitespace-nowrap">{formatDate(task.ngay_hoan_thanh) !== '--' ? formatDate(task.ngay_hoan_thanh) : ''}</td>
                   <td className="align-top text-center py-2 px-1.5 w-28 whitespace-nowrap"><StatusBadge status={task.trang_thai} /></td>
                   <td className="align-top text-center py-2 px-1.5 w-24 whitespace-nowrap"><RatingBadge task={task} rating={calculateEvaluation(task)} /></td>
                   <td className="align-top text-center py-2 px-1 w-24 whitespace-nowrap">
@@ -5084,8 +5084,8 @@ function KPIView({ tasks = [], employees = [], categories = {}, user, addToast }
                         <td className="text-center font-mono text-slate-500">{idx + 1}</td>
                         <td className="font-semibold text-blue-600">{t.so_cong_van || '--'}</td>
                         <td className="font-medium text-slate-800">{t.ten_cong_viec}</td>
-                        <td className="text-center font-mono text-slate-600">{formatDate(t.deadline) !== '--' ? formatDate(t.deadline) : ''}</td>
-                        <td className="text-center font-mono text-slate-600">{formatDate(t.ngay_hoan_thanh) !== '--' ? formatDate(t.ngay_hoan_thanh) : ''}</td>
+                        <td className="text-center text-xs font-medium text-slate-800">{formatDate(t.deadline) !== '--' ? formatDate(t.deadline) : ''}</td>
+                        <td className="text-center text-xs font-medium text-slate-800">{formatDate(t.ngay_hoan_thanh) !== '--' ? formatDate(t.ngay_hoan_thanh) : ''}</td>
                         <td className="text-center"><StatusBadge status={t.trang_thai} /></td>
                       </tr>
                     ))}
