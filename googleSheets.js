@@ -385,9 +385,21 @@ async function initializeDefaultHeadersAndSeed(spreadsheetId) {
 }
 
 // ----------------------------------------------------------------------
+// IN-MEMORY CACHE SYSTEM (Auto-invalidated on write operations)
+// ----------------------------------------------------------------------
+let dataCache = null;
+let dataCacheTimestamp = 0;
+const CACHE_TTL_MS = 5000; // 5 seconds cache TTL for ultra-fast response
+
+function clearDataCache() {
+  dataCache = null;
+  dataCacheTimestamp = 0;
+}
+
+// ----------------------------------------------------------------------
 // GET DATA (ĐỌC DỮ LIỆU TỪ GOOGLE SHEETS)
 // ----------------------------------------------------------------------
-async function getData() {
+async function getData(forceRefresh = false) {
   const spreadsheetId = getSpreadsheetId();
 
   if (!spreadsheetId) {
@@ -395,12 +407,18 @@ async function getData() {
     return loadInitialInMemoryData();
   }
 
+  // Sử dụng bộ nhớ đệm nếu dữ liệu còn mới (< 5 giây) và không yêu cầu làm mới bắt buộc
+  if (!forceRefresh && dataCache && (Date.now() - dataCacheTimestamp < CACHE_TTL_MS)) {
+    return dataCache;
+  }
+
   try {
     await ensureSheetTabs(spreadsheetId);
 
+    // Dải ô động cho Tasks!A1:T (quét 100% dữ liệu thực tế không giới hạn số dòng)
     const res = await sheets.spreadsheets.values.batchGet({
       spreadsheetId,
-      ranges: ['Tasks!A1:T500', 'Employees!A1:E500', 'Settings!A1:O500']
+      ranges: ['Tasks!A1:T', 'Employees!A1:E500', 'Settings!A1:O500']
     });
 
     const valueRanges = res.data.valueRanges || [];
@@ -412,7 +430,7 @@ async function getData() {
     if (tasksRows.length <= 3 && empRows.length <= 3) {
       console.log(`[Google Sheets API] Sheet ID ${spreadsheetId} chưa có dữ liệu. Đang tự động nạp dữ liệu ban đầu...`);
       await initializeDefaultHeadersAndSeed(spreadsheetId);
-      return getData();
+      return getData(true);
     }
 
     // 1. Parse Tasks (Hàng dữ liệu bắt đầu từ Row 4)
@@ -510,7 +528,7 @@ async function getData() {
       }
     }
 
-    return {
+    const parsedResult = {
       tasks,
       employees,
       categories: { departments, agencies, empStatuses },
@@ -518,10 +536,16 @@ async function getData() {
       fileStatus: {
         lastModified: new Date().toISOString(),
         ticks: Date.now(),
-        size: 2048,
+        size: tasks.length * 100 + 1000,
         spreadsheetId
       }
     };
+
+    // Lưu vào bộ nhớ đệm
+    dataCache = parsedResult;
+    dataCacheTimestamp = Date.now();
+
+    return parsedResult;
   } catch (err) {
     console.error('[Google Sheets API Lỗi]:', err.message);
     const memData = loadInitialInMemoryData();
@@ -645,7 +669,7 @@ async function addItem(type, data) {
   // Default: Tasks
   const statusVal = data.trang_thai || 'Đang thực hiện';
 
-  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Tasks!A4:A500' });
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Tasks!A4:A' });
   const existing = res.data.values || [];
   const targetRow = existing.length + 4;
 
@@ -674,6 +698,7 @@ async function addItem(type, data) {
     });
   }
 
+  clearDataCache();
   return { success: true, id: targetRow - 3, excel_row: targetRow, message: 'Added task successfully' };
 }
 
@@ -806,7 +831,7 @@ async function updateItem(type, data) {
   }
 
   // Default: Tasks
-  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Tasks!A4:T500' });
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Tasks!A4:T' });
   const rows = res.data.values || [];
   let targetRow = 0;
 
@@ -879,6 +904,7 @@ async function updateItem(type, data) {
     }
   }
 
+  clearDataCache();
   return { success: true, id: data.id, excel_row: targetRow, message: 'Updated task successfully' };
 }
 
@@ -968,7 +994,7 @@ async function deleteItem(type, id, data) {
   }
 
   // Default: Tasks
-  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Tasks!A4:R500' });
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Tasks!A4:R' });
   const rows = res.data.values || [];
   let targetRow = 0;
 
@@ -1010,6 +1036,7 @@ async function deleteItem(type, id, data) {
     await deleteSheetRow(spreadsheetId, 'Tasks', targetRow);
   }
 
+  clearDataCache();
   return { success: true, id, message: 'Deleted task successfully' };
 }
 
@@ -1055,6 +1082,7 @@ async function getUsersRealtime() {
 
 module.exports = {
   getData,
+  clearDataCache,
   addItem,
   updateItem,
   deleteItem,

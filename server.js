@@ -41,13 +41,100 @@ app.get('/api/status', async (req, res) => {
   }
 });
 
-// 2. GET /api/data
+// 2. GET /api/data (Hỗ trợ In-Memory Cache, Filter & Server-Side Pagination)
 app.get('/api/data', async (req, res) => {
   try {
-    const data = await googleSheets.getData();
-    res.json(data);
+    const forceRefresh = req.query.refresh === 'true';
+    const rawData = await googleSheets.getData(forceRefresh);
+
+    const page = parseInt(req.query.page, 10);
+    const limit = parseInt(req.query.limit, 10);
+
+    // Nếu không truyền tham số page/limit, trả về dữ liệu đầy đủ (tương thích ngược 100%)
+    if (!page || !limit || isNaN(page) || isNaN(limit)) {
+      return res.json(rawData);
+    }
+
+    // Server-side filtering đối với danh sách Tasks
+    let filteredTasks = [...(rawData.tasks || [])];
+    const { department, status, assignee, search } = req.query;
+
+    if (department) {
+      filteredTasks = filteredTasks.filter(t => t.phong_ban === department);
+    }
+    if (status) {
+      filteredTasks = filteredTasks.filter(t => t.trang_thai === status);
+    }
+    if (assignee) {
+      filteredTasks = filteredTasks.filter(t => t.nguoi_phu_trach === assignee);
+    }
+    if (search) {
+      const q = String(search).toLowerCase().trim();
+      filteredTasks = filteredTasks.filter(t =>
+        (t.ten_cong_viec || '').toLowerCase().includes(q) ||
+        (t.so_cong_van || '').toLowerCase().includes(q) ||
+        (t.mo_ta || '').toLowerCase().includes(q)
+      );
+    }
+
+    const totalTasks = filteredTasks.length;
+    const totalPages = Math.ceil(totalTasks / limit) || 1;
+    const startIndex = (page - 1) * limit;
+    const paginatedTasks = filteredTasks.slice(startIndex, startIndex + limit);
+
+    res.json({
+      tasks: paginatedTasks,
+      totalTasks,
+      page,
+      limit,
+      totalPages,
+      employees: rawData.employees || [],
+      categories: rawData.categories || {},
+      users: rawData.users || [],
+      fileStatus: rawData.fileStatus || {}
+    });
   } catch (err) {
     console.error('Lỗi [GET /api/data]:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 2.1 GET /api/tasks (Phân trang riêng danh sách công việc cho API Clients)
+app.get('/api/tasks', async (req, res) => {
+  try {
+    const rawData = await googleSheets.getData();
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 50;
+
+    let tasks = [...(rawData.tasks || [])];
+    const { department, status, assignee, search } = req.query;
+
+    if (department) tasks = tasks.filter(t => t.phong_ban === department);
+    if (status) tasks = tasks.filter(t => t.trang_thai === status);
+    if (assignee) tasks = tasks.filter(t => t.nguoi_phu_trach === assignee);
+    if (search) {
+      const q = String(search).toLowerCase().trim();
+      tasks = tasks.filter(t =>
+        (t.ten_cong_viec || '').toLowerCase().includes(q) ||
+        (t.so_cong_van || '').toLowerCase().includes(q)
+      );
+    }
+
+    const totalTasks = tasks.length;
+    const totalPages = Math.ceil(totalTasks / limit) || 1;
+    const startIndex = (page - 1) * limit;
+    const paginatedTasks = tasks.slice(startIndex, startIndex + limit);
+
+    res.json({
+      success: true,
+      data: paginatedTasks,
+      totalTasks,
+      page,
+      limit,
+      totalPages
+    });
+  } catch (err) {
+    console.error('Lỗi [GET /api/tasks]:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
