@@ -3041,12 +3041,12 @@ function TasksView({
                     </div>
                   </td>
                   <td className="align-top text-xs px-1 py-1.5 w-24">
-                    <div className="text-xs font-medium text-slate-700 leading-tight line-clamp-2" title={task.don_vi_phoi_hop}>
-                      {task.don_vi_phoi_hop || '--'}
+                    <div className="text-xs font-medium text-slate-700 leading-tight line-clamp-2" title={task.don_vi_phoi_hop || ''}>
+                      {task.don_vi_phoi_hop && task.don_vi_phoi_hop !== '--' ? task.don_vi_phoi_hop : ''}
                     </div>
                   </td>
-                  <td className="text-[11px] font-mono align-top text-center py-1.5 px-0.5 w-18 whitespace-nowrap">{formatDate(task.deadline)}</td>
-                  <td className="text-[11px] font-mono align-top text-center py-1.5 px-0.5 w-18 whitespace-nowrap">{formatDate(task.ngay_hoan_thanh)}</td>
+                  <td className="text-[11px] font-mono align-top text-center py-1.5 px-0.5 w-18 whitespace-nowrap">{formatDate(task.deadline) !== '--' ? formatDate(task.deadline) : ''}</td>
+                  <td className="text-[11px] font-mono align-top text-center py-1.5 px-0.5 w-18 whitespace-nowrap">{formatDate(task.ngay_hoan_thanh) !== '--' ? formatDate(task.ngay_hoan_thanh) : ''}</td>
                   <td className="align-top text-center py-1.5 px-0.5 w-20 whitespace-nowrap"><StatusBadge status={task.trang_thai} /></td>
                   <td className="align-top text-center py-1.5 px-0.5 w-16 whitespace-nowrap"><RatingBadge task={task} rating={calculateEvaluation(task)} /></td>
                   <td className="align-top text-center py-1.5 px-0.5 w-20 whitespace-nowrap">
@@ -3196,8 +3196,7 @@ function RatingBadge({ rating, task }) {
   if (evalVal === 'Trễ hạn') return <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded">Trễ hạn</span>;
   if (evalVal === 'Tốt') return <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">Trước hạn</span>;
   if (evalVal === 'Hoàn Thành Trễ hạn') return <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded">Trễ hạn</span>;
-  if (!evalVal || evalVal === '--') return <span className="text-xs text-slate-400">--</span>;
-  return <span className="text-xs text-slate-400">{evalVal}</span>;
+  return null;
 }
 
 // ----------------------------------------------------------------------
@@ -4881,8 +4880,8 @@ function KPIView({ tasks = [], employees = [], categories = {}, user, addToast }
                         <td className="text-center font-mono text-slate-500">{idx + 1}</td>
                         <td className="font-semibold text-blue-600">{t.so_cong_van || '--'}</td>
                         <td className="font-medium text-slate-800">{t.ten_cong_viec}</td>
-                        <td className="text-center font-mono text-slate-600">{formatDate(t.deadline)}</td>
-                        <td className="text-center font-mono text-slate-600">{formatDate(t.ngay_hoan_thanh)}</td>
+                        <td className="text-center font-mono text-slate-600">{formatDate(t.deadline) !== '--' ? formatDate(t.deadline) : ''}</td>
+                        <td className="text-center font-mono text-slate-600">{formatDate(t.ngay_hoan_thanh) !== '--' ? formatDate(t.ngay_hoan_thanh) : ''}</td>
                         <td className="text-center"><StatusBadge status={t.trang_thai} /></td>
                       </tr>
                     ))}
