@@ -5344,7 +5344,7 @@ function ReportsView({ tasks = [], employees = [], categories, user, addToast })
               value={isDeptRestricted ? userDept : selectedDept}
               disabled={isDeptRestricted}
               onChange={(e) => setSelectedDept(e.target.value)}
-              className={`w-full text-xs font-medium border border-slate-200 rounded-xl px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ${
+              className={`form-select w-full ${
                 isDeptRestricted ? 'bg-slate-100 text-slate-500 cursor-not-allowed font-semibold' : ''
               }`}
             >
@@ -5383,7 +5383,7 @@ function ReportsView({ tasks = [], employees = [], categories, user, addToast })
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
-              className="w-full text-xs font-medium border border-slate-200 rounded-xl px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
+              className="form-select w-full"
             >
               <option value="">-- Tất cả tháng --</option>
               {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
@@ -5398,7 +5398,7 @@ function ReportsView({ tasks = [], employees = [], categories, user, addToast })
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(e.target.value)}
-              className="w-full text-xs font-medium border border-slate-200 rounded-xl px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
+              className="form-select w-full"
             >
               <option value="">-- Tất cả năm --</option>
               {yearOptions.map(y => (

@@ -155,22 +155,84 @@ body {
   border-color: #059669;
 }
 
-.form-input, .form-select {
+.form-input {
   height: 38px;
   padding: 0 12px;
   border-radius: var(--radius);
-  border: 1px solid var(--gray-200);
+  border: 1px solid #CBD5E1;
   background-color: #ffffff;
   color: var(--gray-800);
-  font-size: 13.5px;
+  font-size: 13px;
   font-family: var(--font-inter);
+  font-weight: 400;
   outline: none;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   width: 100%;
 }
-.form-input:focus, .form-select:focus {
+.form-input:hover:not(:disabled) {
+  border-color: #94A3B8;
+}
+.form-input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+/* Standardized Modern Select Dropdown Styling */
+select.form-select, .form-select:not(div) {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  height: 38px;
+  padding: 0 32px 0 12px;
+  border-radius: var(--radius);
+  border: 1px solid #CBD5E1;
+  background-color: #ffffff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 16px 16px;
+  color: var(--gray-800);
+  font-size: 13px;
+  font-family: var(--font-inter);
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 100%;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+}
+
+select.form-select:hover:not(:disabled) {
+  border-color: #94A3B8;
+  background-color: #FAFAFA;
+}
+
+select.form-select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  background-color: #ffffff;
+}
+
+select.form-select:disabled {
+  background-color: #F1F5F9 !important;
+  color: #64748B !important;
+  cursor: not-allowed !important;
+  opacity: 0.85;
+  border-color: #E2E8F0 !important;
+}
+
+select.form-select option {
+  background-color: #ffffff;
+  color: #1E293B;
+  padding: 8px 12px;
+  font-weight: 400;
+  font-size: 13px;
+}
+
+select.form-select option:checked {
+  background-color: #EFF6FF;
+  color: #1D4ED8;
+  font-weight: 600;
 }
 
 /* Badges */
