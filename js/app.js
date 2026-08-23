@@ -199,6 +199,7 @@ const ROUTE_MAP = {
   '/nhan-vien': 'category-employees',
   '/kpi-danh-gia': 'kpi',
   '/bao-cao-tong-hop': 'reports',
+  '/lich-cong-tac': 'schedule',
   '/danh-muc/noi-ban-hanh': 'category-agencies',
   '/danh-muc/trang-thai-cong-viec': 'category-statuses',
   '/danh-muc/cong-chuc': 'category-employees',
@@ -212,6 +213,7 @@ const TAB_TO_ROUTE = {
   'employees': '/danh-muc/cong-chuc',
   'kpi': '/kpi-danh-gia',
   'reports': '/bao-cao-tong-hop',
+  'schedule': '/lich-cong-tac',
   'categories': '/danh-muc/noi-ban-hanh',
   'category-agencies': '/danh-muc/noi-ban-hanh',
   'category-statuses': '/danh-muc/trang-thai-cong-viec',
@@ -900,6 +902,7 @@ function App() {
           )}
           {activeTab === 'kpi' && <KPIView tasks={visibleTasks} employees={employees} categories={categories} user={user} addToast={addToast} />}
           {activeTab === 'reports' && <ReportsView tasks={visibleTasks} employees={employees} categories={categories} user={user} addToast={addToast} />}
+          {activeTab === 'schedule' && <ScheduleView />}
           {isAdmin && activeTab === 'categories' && (
             <CategoriesView
               subTab="category-agencies"
@@ -969,6 +972,15 @@ function App() {
           isViewOnly={isViewOnly}
           onClose={() => setModals(prev => ({ ...prev, taskDetail: null }))}
           onOpenEditTask={(t) => setModals({ ...modals, taskDetail: null, editTask: t })}
+          onOpenPrintSubmission={(t) => setModals(prev => ({ ...prev, taskDetail: null, printSubmission: t }))}
+        />
+      )}
+
+      {modals.printSubmission && (
+        <SubmissionPrintModal
+          task={modals.printSubmission}
+          onClose={() => setModals(prev => ({ ...prev, printSubmission: null }))}
+          addToast={addToast}
         />
       )}
 
@@ -1024,7 +1036,8 @@ function Sidebar({ activeTab, setActiveTab, user, onLogout, isCollapsed = false,
     { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
     { id: 'tasks', label: 'Quản lý công việc', icon: 'check-square' },
     { id: 'kpi', label: 'Đánh giá công việc', icon: 'award' },
-    { id: 'reports', label: 'Báo cáo tổng hợp', icon: 'bar-chart-3' }
+    { id: 'reports', label: 'Báo cáo tổng hợp', icon: 'bar-chart-3' },
+    { id: 'schedule', label: 'Lịch công tác', icon: 'calendar' }
   ];
 
   const subMenuItems = [
@@ -1290,6 +1303,7 @@ function Topbar({ user, activeTab, setActiveTab, onOpenMobileDrawer, onLogout, d
       case 'employees': return 'Nhân viên';
       case 'kpi': return 'Đánh giá công việc';
       case 'reports': return 'Báo cáo tổng hợp';
+      case 'schedule': return 'Lịch công tác';
       case 'categories':
       case 'category-agencies': return 'Quản lý danh mục - Nơi ban hành';
       case 'category-statuses': return 'Quản lý danh mục - Trạng thái công việc';
@@ -1559,7 +1573,8 @@ function MobileDrawer({ isOpen, onClose, activeTab, setActiveTab, user, onLogout
     { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
     { id: 'tasks', label: 'Quản lý công việc', icon: 'check-square' },
     { id: 'kpi', label: 'Đánh giá công việc', icon: 'award' },
-    { id: 'reports', label: 'Báo cáo tổng hợp', icon: 'bar-chart-3' }
+    { id: 'reports', label: 'Báo cáo tổng hợp', icon: 'bar-chart-3' },
+    { id: 'schedule', label: 'Lịch công tác', icon: 'calendar' }
   ];
 
   const subMenuItems = [
@@ -3917,7 +3932,7 @@ function EditTaskModal({ task, categories, employees, onClose, onSubmit }) {
 // ----------------------------------------------------------------------
 // 9. MODAL: CHI TIẾT CÔNG VIỆC
 // ----------------------------------------------------------------------
-function TaskDetailModal({ task, isViewOnly, onClose, onOpenEditTask }) {
+function TaskDetailModal({ task, isViewOnly, onClose, onOpenEditTask, onOpenPrintSubmission }) {
   return (
     <div className="modal-backdrop">
       <div className="modal-content max-w-2xl">
@@ -3992,15 +4007,403 @@ function TaskDetailModal({ task, isViewOnly, onClose, onOpenEditTask }) {
           </div>
         </div>
 
-        <div className="modal-footer">
-          <button type="button" onClick={onClose} className="btn-secondary text-xs">
-            Đóng
-          </button>
-          {!isViewOnly && (
-            <button type="button" onClick={() => onOpenEditTask(task)} className="btn-primary text-xs">
-              <i data-lucide="edit-3" className="w-4 h-4"></i> Chỉnh sửa thông tin
+        <div className="modal-footer flex items-center justify-between">
+          {onOpenPrintSubmission && (
+            <button
+              type="button"
+              onClick={() => onOpenPrintSubmission(task)}
+              className="btn-secondary text-xs text-blue-700 border-blue-200 bg-blue-50/80 hover:bg-blue-100 font-semibold inline-flex items-center gap-1.5 shadow-2xs"
+            >
+              <i data-lucide="file-text" className="w-4 h-4"></i> In phiếu trình
             </button>
           )}
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={onClose} className="btn-secondary text-xs">
+              Đóng
+            </button>
+            {!isViewOnly && (
+              <button type="button" onClick={() => onOpenEditTask(task)} className="btn-primary text-xs">
+                <i data-lucide="edit-3" className="w-4 h-4"></i> Chỉnh sửa thông tin
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------
+// SUBMISSION PRINT MODAL (PHIẾU TRÌNH GIẢI QUYẾT CÔNG VIỆC)
+// ----------------------------------------------------------------------
+function SubmissionPrintModal({ task, onClose, addToast }) {
+  if (!task) return null;
+
+  const getTodayVietnameseDate = () => {
+    const now = new Date();
+    const d = String(now.getDate()).padStart(2, '0');
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const y = now.getFullYear();
+    return `Định Mỹ, ngày ${d} tháng ${m} năm ${y}`;
+  };
+
+  const [vanDeTrinh, setVanDeTrinh] = useState(task.ten_cong_viec || '');
+  const [canCu, setCanCu] = useState(() => {
+    const cv = task.so_cong_van ? `Công văn số ${task.so_cong_van}` : 'Văn bản chỉ đạo';
+    const dateStr = formatDate(task.ngay_tao) !== '--' ? ` ngày ${formatDate(task.ngay_tao)}` : '';
+    const noiBanHanhStr = task.noi_ban_hanh ? ` của ${task.noi_ban_hanh}` : '';
+    return `${cv}${dateStr}${noiBanHanhStr} v/v ${task.ten_cong_viec || ''}.`;
+  });
+  const [theLoaiVanBan, setTheLoaiVanBan] = useState('Tờ trình / Báo cáo');
+  const [noiDungVanBan, setNoiDungVanBan] = useState(
+    task.mo_ta
+      ? task.mo_ta
+      : 'Kính trình Lãnh đạo xem xét, phê duyệt nội dung xử lý công việc theo quy định.'
+  );
+  const [noiNhan, setNoiNhan] = useState(
+    task.noi_ban_hanh && task.noi_ban_hanh !== '--' ? task.noi_ban_hanh : 'Ủy ban nhân dân tỉnh An Giang'
+  );
+  const [tenLanhDao, setTenLanhDao] = useState('');
+  const [nguoiTrinh, setNguoiTrinh] = useState(task.nguoi_phu_trach || '');
+  const [phongBan, setPhongBan] = useState(task.phong_ban || 'Kinh tế');
+  const [ngayTrinh, setNgayTrinh] = useState(getTodayVietnameseDate());
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleExportWord = () => {
+    try {
+      const htmlContent = `
+        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head>
+          <meta charset='utf-8'>
+          <title>Phiếu trình giải quyết công việc</title>
+          <style>
+            @page {
+              size: A4;
+              margin: 2cm 2cm 2cm 2.5cm;
+            }
+            body {
+              font-family: 'Times New Roman', Times, serif;
+              font-size: 13pt;
+              line-height: 1.4;
+              color: #000000;
+            }
+            .header-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 15pt;
+            }
+            .header-table td {
+              vertical-align: top;
+              padding: 0;
+            }
+            .header-left {
+              width: 45%;
+              text-align: center;
+            }
+            .header-right {
+              width: 55%;
+              text-align: center;
+            }
+            .bold { font-weight: bold; }
+            .uppercase { text-transform: uppercase; }
+            .doc-title {
+              font-size: 15pt;
+              font-weight: bold;
+              text-align: center;
+              margin-top: 15pt;
+              margin-bottom: 15pt;
+              text-transform: uppercase;
+            }
+            .kinh-gui {
+              text-align: center;
+              font-weight: bold;
+              margin-bottom: 15pt;
+            }
+            .content-section {
+              margin-bottom: 10pt;
+              text-align: justify;
+            }
+            .section-label {
+              font-weight: bold;
+            }
+            .footer-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 25pt;
+            }
+            .footer-table td {
+              vertical-align: top;
+              text-align: center;
+              padding: 5pt;
+            }
+          </style>
+        </head>
+        <body>
+          <table class="header-table">
+            <tr>
+              <td class="header-left">
+                <div>UBND XÃ ĐỊNH MỸ</div>
+                <div class="bold uppercase">PHÒNG ${(phongBan || 'Kinh tế').toUpperCase()}</div>
+                <div>Số: ....../PTr-UBND</div>
+              </td>
+              <td class="header-right">
+                <div class="bold">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+                <div class="bold">Độc lập - Tự do - Hạnh phúc</div>
+                <div style="font-style: italic; margin-top: 5pt;">${ngayTrinh}</div>
+              </td>
+            </tr>
+          </table>
+
+          <div class="doc-title">PHIẾU TRÌNH GIẢI QUYẾT CÔNG VIỆC</div>
+
+          <div class="kinh-gui">Kính gửi: ${noiNhan}${tenLanhDao ? ' - ' + tenLanhDao : ''}</div>
+
+          <div class="content-section">
+            <span class="section-label">1. Vấn đề trình:</span> ${vanDeTrinh}
+          </div>
+
+          <div class="content-section">
+            <span class="section-label">2. Căn cứ trình:</span> ${canCu}
+          </div>
+
+          <div class="content-section">
+            <span class="section-label">3. Thể loại văn bản:</span> ${theLoaiVanBan}
+          </div>
+
+          <div class="content-section">
+            <span class="section-label">4. Tóm tắt nội dung trình / Đề xuất:</span><br/>
+            ${(noiDungVanBan || '').replace(/\n/g, '<br/>')}
+          </div>
+
+          <table class="footer-table">
+            <tr>
+              <td style="width: 33%;">
+                <div class="bold">NƠI NHẬN:</div>
+                <div style="font-size: 11pt; text-align: left; margin-top: 5pt;">
+                  - Như trên;<br/>
+                  - Lưu: VT, ${phongBan || 'Kinh tế'}.
+                </div>
+              </td>
+              <td style="width: 34%;">
+                <div class="bold">Ý KIẾN NỔI BẬT CỦA LÃNH ĐẠO</div>
+                <div style="height: 60pt;"></div>
+              </td>
+              <td style="width: 33%;">
+                <div class="bold">NGƯỜI TRÌNH</div>
+                <div style="font-style: italic; font-size: 11pt;">(Ký, ghi rõ họ tên)</div>
+                <div style="height: 50pt;"></div>
+                <div class="bold">${nguoiTrinh || '..........................'}</div>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `;
+
+      const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const cleanSoCV = (task.so_cong_van || `Task_${task.id}`).replace(/[\/\\]/g, '_');
+      a.download = `Phieu_trinh_${cleanSoCV}.doc`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      if (addToast) addToast('success', 'Xuất Word', 'Đã tải xuống tệp Phiếu trình (.doc)');
+    } catch (err) {
+      console.error('Lỗi xuất Word:', err);
+      if (addToast) addToast('danger', 'Lỗi xuất Word', 'Không thể tạo file Word: ' + err.message);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop overflow-y-auto py-6">
+      <div className="modal-content max-w-4xl bg-slate-100 p-0 overflow-hidden shadow-2xl my-auto">
+        {/* Top Action Bar */}
+        <div className="bg-slate-900 text-white p-4 flex items-center justify-between no-print">
+          <div className="flex items-center gap-2">
+            <i data-lucide="file-text" className="w-5 h-5 text-blue-400"></i>
+            <div>
+              <h3 className="font-bold text-sm text-white">Soạn thảo & In Phiếu trình giải quyết công việc</h3>
+              <p className="text-[11px] text-slate-400">Tùy chỉnh nội dung trực tiếp trước khi in hoặc xuất file Word</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors shadow-xs"
+            >
+              <i data-lucide="printer" className="w-4 h-4"></i> In phiếu
+            </button>
+            <button
+              type="button"
+              onClick={handleExportWord}
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors shadow-xs"
+            >
+              <i data-lucide="download" className="w-4 h-4"></i> Xuất Word (.doc)
+            </button>
+            <button type="button" onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white">
+              <i data-lucide="x" className="w-5 h-5"></i>
+            </button>
+          </div>
+        </div>
+
+        {/* Printable Document Layout Sheet */}
+        <div className="p-6 md:p-10 space-y-6 overflow-y-auto max-h-[80vh]">
+          <div className="print-a4-sheet bg-white rounded-xl shadow-lg border border-slate-300 p-8 md:p-12 text-slate-900 mx-auto font-serif text-sm leading-relaxed max-w-3xl">
+            {/* Header section */}
+            <div className="grid grid-cols-2 gap-4 pb-6 border-b border-slate-200">
+              <div className="text-center space-y-1">
+                <div className="font-bold text-xs uppercase text-slate-700">UBND XÃ ĐỊNH MỸ</div>
+                <div className="flex items-center justify-center gap-1">
+                  <span className="font-bold text-xs uppercase text-slate-900">PHÒNG:</span>
+                  <input
+                    type="text"
+                    value={phongBan}
+                    onChange={e => setPhongBan(e.target.value)}
+                    className="font-bold text-xs uppercase border-b border-slate-300 focus:border-blue-500 outline-none text-center px-1"
+                  />
+                </div>
+                <div className="text-xs text-slate-500 font-sans">Số: ...../PTr-UBND</div>
+              </div>
+              <div className="text-center space-y-1">
+                <div className="font-bold text-xs uppercase text-slate-900">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+                <div className="font-bold text-xs text-slate-800">Độc lập - Tự do - Hạnh phúc</div>
+                <div className="pt-1">
+                  <input
+                    type="text"
+                    value={ngayTrinh}
+                    onChange={e => setNgayTrinh(e.target.value)}
+                    className="italic text-xs border-b border-slate-300 focus:border-blue-500 outline-none text-center w-full"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Title */}
+            <div className="my-6 text-center">
+              <h2 className="font-bold text-lg text-slate-900 uppercase tracking-wide">PHIẾU TRÌNH GIẢI QUYẾT CÔNG VIỆC</h2>
+            </div>
+
+            {/* Interactive Form Fields */}
+            <div className="space-y-4 text-xs md:text-sm">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-slate-900 min-w-[90px]">Kính gửi:</span>
+                <input
+                  type="text"
+                  value={noiNhan}
+                  onChange={e => setNoiNhan(e.target.value)}
+                  placeholder="Nhập nơi nhận (VD: Ủy ban nhân dân tỉnh An Giang)"
+                  className="form-input flex-1 text-xs py-1.5 bg-slate-50 border-slate-300 focus:bg-white font-medium"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-slate-900 min-w-[90px]">Lãnh đạo:</span>
+                <input
+                  type="text"
+                  value={tenLanhDao}
+                  onChange={e => setTenLanhDao(e.target.value)}
+                  placeholder="Nhập tên Lãnh đạo nhận trình (Để trống nếu gửi chung)"
+                  className="form-input flex-1 text-xs py-1.5 bg-slate-50 border-slate-300 focus:bg-white"
+                />
+              </div>
+
+              <div className="space-y-1 pt-2">
+                <label className="font-bold text-slate-900 block">1. Vấn đề trình:</label>
+                <textarea
+                  value={vanDeTrinh}
+                  onChange={e => setVanDeTrinh(e.target.value)}
+                  rows={2}
+                  className="form-input w-full text-xs p-2 bg-slate-50 border-slate-300 focus:bg-white font-medium leading-normal"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-slate-900 block">2. Căn cứ trình:</label>
+                <textarea
+                  value={canCu}
+                  onChange={e => setCanCu(e.target.value)}
+                  rows={2}
+                  className="form-input w-full text-xs p-2 bg-slate-50 border-slate-300 focus:bg-white leading-normal"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-slate-900 block">3. Thể loại văn bản:</label>
+                <input
+                  type="text"
+                  value={theLoaiVanBan}
+                  onChange={e => setTheLoaiVanBan(e.target.value)}
+                  placeholder="Nhập thể loại (Ví dụ: Tờ trình / Công văn / Báo cáo)"
+                  className="form-input w-full text-xs py-1.5 bg-slate-50 border-slate-300 focus:bg-white font-medium"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-slate-900 block">4. Nội dung tóm tắt trình / Đề xuất:</label>
+                <textarea
+                  value={noiDungVanBan}
+                  onChange={e => setNoiDungVanBan(e.target.value)}
+                  rows={4}
+                  placeholder="Nhập chi tiết nội dung tóm tắt hoặc phương án đề xuất trình Lãnh đạo..."
+                  className="form-input w-full text-xs p-2.5 bg-slate-50 border-slate-300 focus:bg-white leading-relaxed"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-4 pt-8 text-center text-xs">
+                <div>
+                  <div className="font-bold text-slate-900 uppercase">Nơi nhận</div>
+                  <div className="text-[11px] text-slate-500 text-left pt-2 font-sans space-y-0.5">
+                    <div>- Như trên;</div>
+                    <div>- Lưu: VT, {phongBan}.</div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="font-bold text-slate-900 uppercase">Ý kiến Lãnh đạo</div>
+                  <div className="h-16 border-b border-dashed border-slate-300 mt-2"></div>
+                </div>
+
+                <div>
+                  <div className="font-bold text-slate-900 uppercase">Người trình</div>
+                  <div className="italic text-[11px] text-slate-400">(Ký, ghi rõ họ tên)</div>
+                  <div className="pt-10">
+                    <input
+                      type="text"
+                      value={nguoiTrinh}
+                      onChange={e => setNguoiTrinh(e.target.value)}
+                      placeholder="Họ tên người trình"
+                      className="font-bold text-xs text-center border-b border-slate-300 focus:border-blue-500 outline-none w-full"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer controls */}
+        <div className="bg-slate-50 p-4 border-t border-slate-200 flex items-center justify-between no-print">
+          <span className="text-xs text-slate-500 font-sans">
+            Mã công việc: <strong className="text-slate-800">#{task.id}</strong> - Số CV: <strong className="text-blue-600">{task.so_cong_van || '--'}</strong>
+          </span>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={onClose} className="btn-secondary text-xs">
+              Hủy / Đóng
+            </button>
+            <button type="button" onClick={handleExportWord} className="btn-secondary text-xs text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100 font-semibold inline-flex items-center gap-1.5">
+              <i data-lucide="download" className="w-4 h-4"></i> Xuất Word (.doc)
+            </button>
+            <button type="button" onClick={handlePrint} className="btn-primary text-xs font-semibold inline-flex items-center gap-1.5">
+              <i data-lucide="printer" className="w-4 h-4"></i> In phiếu
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -5109,6 +5512,66 @@ function KPIView({ tasks = [], employees = [], categories = {}, user, addToast }
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------
+// 11b. SCHEDULE VIEW COMPONENT (Embedded Work Schedule)
+// ----------------------------------------------------------------------
+function ScheduleView() {
+  const [iframeKey, setIframeKey] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const handleRefresh = () => {
+    setIsLoading(true);
+    setIframeKey(prev => prev + 1);
+  };
+
+  const scheduleUrl = "http://llvdinhmy.somee.com/llv";
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-5.25rem)] md:h-[calc(100vh-5.5rem)] w-full gap-2 overflow-hidden">
+      {/* Compact Streamlined Action Toolbar */}
+      <div className="bg-white rounded-xl border border-slate-200/80 px-2.5 py-1.5 flex items-center justify-end gap-1.5 shadow-2xs shrink-0">
+        <button
+          type="button"
+          onClick={handleRefresh}
+          className="px-2.5 py-1 rounded-lg text-[11px] font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 hover:text-slate-900 transition-colors flex items-center gap-1"
+          title="Tải lại trang lịch công tác"
+        >
+          <Icon name="refresh-cw" className={`w-3 h-3 ${isLoading ? 'animate-spin text-blue-600' : ''}`} />
+          <span>Tải lại</span>
+        </button>
+        <a
+          href={scheduleUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-2.5 py-1 rounded-lg text-[11px] font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors flex items-center gap-1 shadow-2xs"
+          title="Mở trang trong cửa sổ mới"
+        >
+          <Icon name="external-link" className="w-3 h-3" />
+          <span>Mở tab mới</span>
+        </a>
+      </div>
+
+      {/* Main Iframe Wrapper */}
+      <div className="flex-1 bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden relative flex flex-col min-h-0">
+        {isLoading && (
+          <div className="absolute inset-0 bg-white/90 backdrop-blur-xs flex flex-col items-center justify-center z-10 gap-3">
+            <div className="w-10 h-10 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-sm font-medium text-slate-600">Đang tải lịch công tác...</p>
+          </div>
+        )}
+
+        <iframe
+          key={iframeKey}
+          src={scheduleUrl}
+          title="Lịch công tác UBND Xã Định Mỹ"
+          className="w-full h-full border-0 flex-1 min-h-0"
+          onLoad={() => setIsLoading(false)}
+        />
+      </div>
     </div>
   );
 }

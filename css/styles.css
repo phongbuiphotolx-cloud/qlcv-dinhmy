@@ -495,3 +495,36 @@ select.form-select option:checked {
   from { transform: translateX(100%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
 }
+
+/* Print Media Styles for Phiếu Trình */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-a4-sheet, .print-a4-sheet * {
+    visibility: visible;
+  }
+  .print-a4-sheet {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 1.5cm !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+  }
+  .no-print, .modal-backdrop, .modal-header, .modal-footer, header, sidebar {
+    display: none !important;
+  }
+  input, textarea {
+    border: none !important;
+    background: transparent !important;
+    resize: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+}
