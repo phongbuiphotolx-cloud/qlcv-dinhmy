@@ -5521,6 +5521,7 @@ function KPIView({ tasks = [], employees = [], categories = {}, user, addToast }
 // ----------------------------------------------------------------------
 function ScheduleView() {
   const scheduleUrl = "http://llvdinhmy.somee.com/llv";
+  const displayUrl = "llvdinhmy.somee.com/llv";
 
   return (
     <div className="w-full max-w-4xl mx-auto py-4 md:py-8 px-2">
@@ -5605,8 +5606,8 @@ function ScheduleView() {
                 <Icon name="link-2" className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-xs font-bold text-slate-800">Đường dẫn trực tiếp:</p>
-                <p className="text-xs font-mono text-blue-600 break-all">{scheduleUrl}</p>
+                <p className="text-xs font-bold text-slate-800">Cổng thông tin Lịch công tác:</p>
+                <p className="text-xs font-mono text-blue-600 break-all">{displayUrl}</p>
               </div>
             </div>
 
