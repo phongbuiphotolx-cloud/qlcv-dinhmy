@@ -5528,7 +5528,7 @@ function ScheduleView() {
     setIframeKey(prev => prev + 1);
   };
 
-  const scheduleUrl = "http://llvdinhmy.somee.com/llv";
+  const scheduleUrl = "https://llvdinhmy.somee.com/llv";
 
   return (
     <div className="flex flex-col h-[calc(100vh-5.25rem)] md:h-[calc(100vh-5.5rem)] w-full gap-2 overflow-hidden">
