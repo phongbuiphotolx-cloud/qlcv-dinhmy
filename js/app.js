@@ -5547,9 +5547,6 @@ function ScheduleView() {
                 <h2 className="text-xl md:text-2xl font-black text-white tracking-tight leading-tight">
                   Hệ thống Lịch công tác & Làm việc
                 </h2>
-                <p className="text-xs md:text-sm font-medium text-blue-100 mt-1">
-                  UBND XÃ ĐỊNH MỸ • TRANG THÔNG TIN TRỰC TUYẾN
-                </p>
               </div>
             </div>
 
@@ -5568,34 +5565,25 @@ function ScheduleView() {
         {/* Content & Feature Highlights */}
         <div className="p-6 md:p-8 bg-white space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex flex-col gap-2">
-              <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                <Icon name="calendar-days" className="w-4 h-4" />
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                <Icon name="calendar-days" className="w-4.5 h-4.5" />
               </div>
               <h3 className="font-bold text-sm text-slate-800">Lịch làm việc chi tiết</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Tra cứu đầy đủ lịch họp, lịch tiếp công dân và công tác tuần của Thường trực UBND xã.
-              </p>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex flex-col gap-2">
-              <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
-                <Icon name="globe" className="w-4 h-4" />
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                <Icon name="globe" className="w-4.5 h-4.5" />
               </div>
               <h3 className="font-bold text-sm text-slate-800">Truy cập riêng biệt</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Hệ thống lịch công tác hoạt động trên máy chủ độc lập, đảm bảo tốc độ và sự ổn định cao.
-              </p>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex flex-col gap-2">
-              <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
-                <Icon name="shield-check" className="w-4 h-4" />
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                <Icon name="shield-check" className="w-4.5 h-4.5" />
               </div>
               <h3 className="font-bold text-sm text-slate-800">An toàn & Bảo mật</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Mở liên kết trong tab riêng giúp ứng dụng chính Vercel giữ nguyên trạng thái bảo mật HTTPS 100%.
-              </p>
             </div>
           </div>
 
