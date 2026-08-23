@@ -5517,60 +5517,111 @@ function KPIView({ tasks = [], employees = [], categories = {}, user, addToast }
 }
 
 // ----------------------------------------------------------------------
-// 11b. SCHEDULE VIEW COMPONENT (Embedded Work Schedule)
+// 11b. SCHEDULE VIEW COMPONENT (External Link Card Interface)
 // ----------------------------------------------------------------------
 function ScheduleView() {
-  const [iframeKey, setIframeKey] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const handleRefresh = () => {
-    setIsLoading(true);
-    setIframeKey(prev => prev + 1);
-  };
-
-  const scheduleUrl = "https://llvdinhmy.somee.com/llv";
+  const scheduleUrl = "http://llvdinhmy.somee.com/llv";
 
   return (
-    <div className="flex flex-col h-[calc(100vh-5.25rem)] md:h-[calc(100vh-5.5rem)] w-full gap-2 overflow-hidden">
-      {/* Compact Streamlined Action Toolbar */}
-      <div className="bg-white rounded-xl border border-slate-200/80 px-2.5 py-1.5 flex items-center justify-end gap-1.5 shadow-2xs shrink-0">
-        <button
-          type="button"
-          onClick={handleRefresh}
-          className="px-2.5 py-1 rounded-lg text-[11px] font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 hover:text-slate-900 transition-colors flex items-center gap-1"
-          title="Tải lại trang lịch công tác"
-        >
-          <Icon name="refresh-cw" className={`w-3 h-3 ${isLoading ? 'animate-spin text-blue-600' : ''}`} />
-          <span>Tải lại</span>
-        </button>
-        <a
-          href={scheduleUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="px-2.5 py-1 rounded-lg text-[11px] font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors flex items-center gap-1 shadow-2xs"
-          title="Mở trang trong cửa sổ mới"
-        >
-          <Icon name="external-link" className="w-3 h-3" />
-          <span>Mở tab mới</span>
-        </a>
-      </div>
+    <div className="w-full max-w-4xl mx-auto py-4 md:py-8 px-2">
+      {/* Main Preview Card */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-md overflow-hidden transition-all duration-300">
+        
+        {/* Banner / Header with Gradient */}
+        <div className="relative bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white p-6 md:p-10 overflow-hidden">
+          {/* Subtle Decorative Accents */}
+          <div className="absolute -right-10 -bottom-10 w-48 h-48 rounded-full bg-white/10 blur-2xl pointer-events-none"></div>
+          <div className="absolute left-1/2 -top-10 w-32 h-32 rounded-full bg-blue-400/20 blur-xl pointer-events-none"></div>
 
-      {/* Main Iframe Wrapper */}
-      <div className="flex-1 bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden relative flex flex-col min-h-0">
-        {isLoading && (
-          <div className="absolute inset-0 bg-white/90 backdrop-blur-xs flex flex-col items-center justify-center z-10 gap-3">
-            <div className="w-10 h-10 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-sm font-medium text-slate-600">Đang tải lịch công tác...</p>
+          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 text-white flex items-center justify-center shadow-lg shrink-0">
+                <Icon name="calendar" className="w-8 h-8 md:w-9 md:h-9 text-white" />
+              </div>
+              <div>
+                <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 mb-2 backdrop-blur-xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Hệ thống sẵn sàng
+                </div>
+                <h2 className="text-xl md:text-2xl font-black text-white tracking-tight leading-tight">
+                  Hệ thống Lịch công tác & Làm việc
+                </h2>
+                <p className="text-xs md:text-sm font-medium text-blue-100 mt-1">
+                  UBND XÃ ĐỊNH MỸ • TRANG THÔNG TIN TRỰC TUYẾN
+                </p>
+              </div>
+            </div>
+
+            <a
+              href={scheduleUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full md:w-auto inline-flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl bg-white text-blue-700 hover:bg-blue-50 font-bold text-sm shadow-lg transition-all duration-200 active:scale-95 group shrink-0"
+            >
+              <span>Xem Lịch công tác (Mở tab mới)</span>
+              <Icon name="external-link" className="w-4 h-4 text-blue-600 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+            </a>
           </div>
-        )}
+        </div>
 
-        <iframe
-          key={iframeKey}
-          src={scheduleUrl}
-          title="Lịch công tác UBND Xã Định Mỹ"
-          className="w-full h-full border-0 flex-1 min-h-0"
-          onLoad={() => setIsLoading(false)}
-        />
+        {/* Content & Feature Highlights */}
+        <div className="p-6 md:p-8 bg-white space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex flex-col gap-2">
+              <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                <Icon name="calendar-days" className="w-4 h-4" />
+              </div>
+              <h3 className="font-bold text-sm text-slate-800">Lịch làm việc chi tiết</h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Tra cứu đầy đủ lịch họp, lịch tiếp công dân và công tác tuần của Thường trực UBND xã.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex flex-col gap-2">
+              <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                <Icon name="globe" className="w-4 h-4" />
+              </div>
+              <h3 className="font-bold text-sm text-slate-800">Truy cập riêng biệt</h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Hệ thống lịch công tác hoạt động trên máy chủ độc lập, đảm bảo tốc độ và sự ổn định cao.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex flex-col gap-2">
+              <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                <Icon name="shield-check" className="w-4 h-4" />
+              </div>
+              <h3 className="font-bold text-sm text-slate-800">An toàn & Bảo mật</h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Mở liên kết trong tab riêng giúp ứng dụng chính Vercel giữ nguyên trạng thái bảo mật HTTPS 100%.
+              </p>
+            </div>
+          </div>
+
+          {/* Action Footer Callout */}
+          <div className="p-4 rounded-xl bg-blue-50/70 border border-blue-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0">
+                <Icon name="link-2" className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-800">Đường dẫn trực tiếp:</p>
+                <p className="text-xs font-mono text-blue-600 break-all">{scheduleUrl}</p>
+              </div>
+            </div>
+
+            <a
+              href={scheduleUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition-colors shrink-0 shadow-xs"
+            >
+              <span>Truy cập ngay</span>
+              <Icon name="arrow-right" className="w-3.5 h-3.5" />
+            </a>
+          </div>
+        </div>
+
       </div>
     </div>
   );
