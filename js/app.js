@@ -4053,9 +4053,7 @@ function SubmissionPrintModal({ task, onClose, addToast }) {
   const todayDateStr = getTodayVietnameseDate();
 
   // Dynamic initial fillings
-  const defaultKinhGui = (task.noi_ban_hanh && task.noi_ban_hanh !== '--')
-    ? `Lãnh đạo ${task.noi_ban_hanh}`
-    : 'Lãnh đạo UBND xã Định Mỹ';
+  const defaultKinhGui = 'Lãnh đạo UBND xã Định Mỹ';
 
   const defaultVanDeTrinh = task.ten_cong_viec
     ? `V/v ${task.ten_cong_viec}`
