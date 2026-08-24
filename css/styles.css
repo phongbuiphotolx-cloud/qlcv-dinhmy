@@ -496,35 +496,171 @@ select.form-select option:checked {
   to { transform: translateX(0); opacity: 1; }
 }
 
-/* Print Media Styles for Phiếu Trình */
+/* Print Media Styles & A4 Template Styles for Phiếu Trình */
+.a4-page {
+  width: 210mm;
+  min-height: 297mm;
+  padding: 15mm 15mm 15mm 20mm; /* Cân chỉnh lề tối ưu không gian */
+  margin: 0 auto;
+  background: #ffffff;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  font-family: "Times New Roman", Times, serif;
+  font-size: 13pt;
+  line-height: 1.35;
+  color: #000000;
+  box-sizing: border-box;
+}
+
+/* Phần đầu phiếu trình: Quốc hiệu & Cơ quan */
+.a4-page .header-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 15px;
+}
+.a4-page .header-table td {
+  vertical-align: top;
+  width: 50%;
+  text-align: center;
+}
+.a4-page .unit-name {
+  font-weight: bold;
+  font-size: 12pt;
+}
+.a4-page .nation-title {
+  font-weight: bold;
+  font-size: 12pt;
+  white-space: nowrap; /* Ép nằm trên 1 hàng không bị xuống dòng */
+}
+.a4-page .date-text {
+  font-style: italic;
+  font-size: 12pt;
+  margin-top: 4px;
+  white-space: nowrap; /* Ép ngày tháng năm nằm trên 1 hàng */
+}
+
+/* Tiêu đề chính */
+.a4-page .main-title {
+  text-align: center;
+  font-weight: bold;
+  font-size: 15pt;
+  margin: 20px 0 10px 0;
+  text-transform: uppercase;
+}
+
+.a4-page .recipient-line {
+  font-weight: bold;
+  margin-bottom: 12px;
+  font-size: 13pt;
+  text-align: center;
+}
+
+/* Vấn đề trình */
+.a4-page .issue-section {
+  margin-bottom: 15px;
+  text-align: justify;
+}
+
+/* Bảng nội dung bung rộng toàn trang A4 */
+.a4-page .content-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 5px;
+  margin-bottom: 20px;
+}
+.a4-page .content-table th, .a4-page .content-table td {
+  border: 1px solid #000000;
+  padding: 10px 12px;
+  vertical-align: top;
+}
+.a4-page .content-table th {
+  text-align: center;
+  font-weight: bold;
+  background-color: #f5f5f5;
+  font-size: 12pt;
+}
+
+/* Khu vực chữ ký & đề xuất */
+.a4-page .signature-box {
+  text-align: center;
+  margin-top: 10px;
+}
+.a4-page .signature-title {
+  font-weight: bold;
+  font-size: 12pt;
+}
+.a4-page .signature-subtitle {
+  font-style: italic;
+  font-size: 11pt;
+  margin-bottom: 50px;
+}
+.a4-page .signature-name {
+  font-weight: bold;
+  font-size: 12pt;
+  text-transform: uppercase;
+}
+
+/* Vùng có thể chỉnh sửa trực tiếp (contenteditable) */
+.a4-page [contenteditable="true"] {
+  outline: 1px dashed transparent;
+  transition: outline 0.2s, background-color 0.2s;
+  border-radius: 2px;
+}
+.a4-page [contenteditable="true"]:hover {
+  outline: 1px dashed #3b82f6;
+  background-color: rgba(59, 130, 246, 0.04);
+}
+.a4-page [contenteditable="true"]:focus {
+  outline: 1px solid #2563eb;
+  background-color: #ffffff;
+}
+
+/* Định dạng khi in ấn thực tế */
 @media print {
-  body * {
-    visibility: hidden;
+  @page {
+    size: A4 portrait;
+    margin: 10mm 15mm 10mm 15mm;
   }
-  .print-a4-sheet, .print-a4-sheet * {
-    visibility: visible;
-  }
-  .print-a4-sheet {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-    padding: 1.5cm !important;
-    border: none !important;
-    box-shadow: none !important;
-    border-radius: 0 !important;
+  body {
     background: #ffffff !important;
   }
-  .no-print, .modal-backdrop, .modal-header, .modal-footer, header, sidebar {
+  .no-print, header, sidebar, nav {
     display: none !important;
   }
-  input, textarea {
-    border: none !important;
-    background: transparent !important;
-    resize: none !important;
-    box-shadow: none !important;
+  .modal-backdrop {
+    position: static !important;
+    background: none !important;
     padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+  .modal-content {
+    box-shadow: none !important;
+    border: none !important;
+    background: none !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+  .a4-page {
+    position: static !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    min-height: auto !important;
+    display: block !important;
+    visibility: visible !important;
+  }
+  .a4-page * {
+    visibility: visible !important;
+  }
+  .a4-page [contenteditable="true"]:hover,
+  .a4-page [contenteditable="true"]:focus,
+  .a4-page [contenteditable="true"] {
+    outline: none !important;
+    background-color: transparent !important;
   }
 }

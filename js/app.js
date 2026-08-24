@@ -4034,10 +4034,12 @@ function TaskDetailModal({ task, isViewOnly, onClose, onOpenEditTask, onOpenPrin
 }
 
 // ----------------------------------------------------------------------
-// SUBMISSION PRINT MODAL (PHIẾU TRÌNH GIẢI QUYẾT CÔNG VIỆC)
+// SUBMISSION PRINT MODAL (PHIẾU TRÌNH GIẢI QUYẾT CÔNG VIỆC CHUẨN A4)
 // ----------------------------------------------------------------------
 function SubmissionPrintModal({ task, onClose, addToast }) {
   if (!task) return null;
+
+  const a4PageRef = useRef(null);
 
   const getTodayVietnameseDate = () => {
     const now = new Date();
@@ -4047,158 +4049,327 @@ function SubmissionPrintModal({ task, onClose, addToast }) {
     return `Định Mỹ, ngày ${d} tháng ${m} năm ${y}`;
   };
 
-  const [vanDeTrinh, setVanDeTrinh] = useState(task.ten_cong_viec || '');
-  const [canCu, setCanCu] = useState(() => {
-    const cv = task.so_cong_van ? `Công văn số ${task.so_cong_van}` : 'Văn bản chỉ đạo';
-    const dateStr = formatDate(task.ngay_tao) !== '--' ? ` ngày ${formatDate(task.ngay_tao)}` : '';
-    const noiBanHanhStr = task.noi_ban_hanh ? ` của ${task.noi_ban_hanh}` : '';
-    return `${cv}${dateStr}${noiBanHanhStr} v/v ${task.ten_cong_viec || ''}.`;
-  });
-  const [theLoaiVanBan, setTheLoaiVanBan] = useState('Tờ trình / Báo cáo');
-  const [noiDungVanBan, setNoiDungVanBan] = useState(
-    task.mo_ta
-      ? task.mo_ta
-      : 'Kính trình Lãnh đạo xem xét, phê duyệt nội dung xử lý công việc theo quy định.'
-  );
-  const [noiNhan, setNoiNhan] = useState(
-    task.noi_ban_hanh && task.noi_ban_hanh !== '--' ? task.noi_ban_hanh : 'Ủy ban nhân dân tỉnh An Giang'
-  );
-  const [tenLanhDao, setTenLanhDao] = useState('');
-  const [nguoiTrinh, setNguoiTrinh] = useState(task.nguoi_phu_trach || '');
-  const [phongBan, setPhongBan] = useState(task.phong_ban || 'Kinh tế');
-  const [ngayTrinh, setNgayTrinh] = useState(getTodayVietnameseDate());
+  const phongBanName = (task.phong_ban || 'Kinh tế').toUpperCase();
+  const todayDateStr = getTodayVietnameseDate();
+
+  // Dynamic initial fillings
+  const defaultKinhGui = (task.noi_ban_hanh && task.noi_ban_hanh !== '--')
+    ? `Lãnh đạo ${task.noi_ban_hanh}`
+    : 'Lãnh đạo UBND xã Định Mỹ';
+
+  const defaultVanDeTrinh = task.ten_cong_viec
+    ? `V/v ${task.ten_cong_viec}`
+    : 'V/v góp ý dự thảo Kế hoạch Đào tạo nâng cao chất lượng lao động ngành nông nghiệp, hình thành lực lượng nông dân số, nông dân chuyên nghiệp và đội ngũ quản trị hợp tác xã hiện đại giai đoạn 2026-2030 trên địa bàn tỉnh An Giang.';
+
+  const defaultCanCu = (() => {
+    const soCV = task.so_cong_van ? `Công văn số ${task.so_cong_van}` : 'Công văn số 9959/SNNMT-CCPTNTQLCL';
+    const dateStr = formatDate(task.ngay_tao) !== '--' ? ` ngày ${formatDate(task.ngay_tao)}` : ' ngày 14 tháng 8 năm 2026';
+    const noiBanHanhStr = (task.noi_ban_hanh && task.noi_ban_hanh !== '--') ? ` của ${task.noi_ban_hanh}` : ' của Sở Nông nghiệp và Môi trường tỉnh An Giang';
+    const noiDungStr = (task.mo_ta || task.ten_cong_viec) ? ` v/v ${task.mo_ta || task.ten_cong_viec}` : '';
+    return `Thực hiện theo ${soCV}${dateStr}${noiBanHanhStr}${noiDungStr}.`;
+  })();
+
+  const defaultTheLoai = 'Công văn';
+  const defaultNoiDungVB = task.mo_ta || task.ten_cong_viec || 'góp ý dự thảo Kế hoạch Đào tạo nâng cao chất lượng lao động...';
+  const defaultNoiNhan = (task.noi_ban_hanh && task.noi_ban_hanh !== '--') ? task.noi_ban_hanh : (task.noi_ban_hanh || 'Sở Nông nghiệp và Môi trường tỉnh An Giang');
+  const defaultNguoiTrinh = task.nguoi_phu_trach || 'Trần Quốc Phong';
 
   const handlePrint = () => {
-    window.print();
-  };
-
-  const handleExportWord = () => {
     try {
-      const htmlContent = `
-        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      const pageNode = a4PageRef.current;
+      if (!pageNode) {
+        window.print();
+        return;
+      }
+
+      const printHtml = `
+        <!DOCTYPE html>
+        <html lang="vi">
         <head>
-          <meta charset='utf-8'>
+          <meta charset="UTF-8">
           <title>Phiếu trình giải quyết công việc</title>
           <style>
             @page {
-              size: A4;
-              margin: 2cm 2cm 2cm 2.5cm;
+              size: A4 portrait;
+              margin: 10mm 15mm 10mm 15mm;
             }
             body {
-              font-family: 'Times New Roman', Times, serif;
+              margin: 0;
+              padding: 0;
+              background: #ffffff;
+              font-family: "Times New Roman", Times, serif;
               font-size: 13pt;
-              line-height: 1.4;
+              line-height: 1.35;
+              color: #000000;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .a4-page {
+              width: 100%;
+              min-height: auto;
+              padding: 0;
+              margin: 0;
+              box-shadow: none;
+              font-family: "Times New Roman", Times, serif;
+              font-size: 13pt;
+              line-height: 1.35;
               color: #000000;
             }
             .header-table {
               width: 100%;
               border-collapse: collapse;
-              margin-bottom: 15pt;
+              margin-bottom: 15px;
             }
             .header-table td {
               vertical-align: top;
-              padding: 0;
-            }
-            .header-left {
-              width: 45%;
+              width: 50%;
               text-align: center;
             }
-            .header-right {
-              width: 55%;
-              text-align: center;
-            }
-            .bold { font-weight: bold; }
-            .uppercase { text-transform: uppercase; }
-            .doc-title {
-              font-size: 15pt;
+            .unit-name {
               font-weight: bold;
+              font-size: 12pt;
+            }
+            .nation-title {
+              font-weight: bold;
+              font-size: 12pt;
+              white-space: nowrap;
+            }
+            .date-text {
+              font-style: italic;
+              font-size: 12pt;
+              margin-top: 4px;
+              white-space: nowrap;
+            }
+            .main-title {
               text-align: center;
-              margin-top: 15pt;
-              margin-bottom: 15pt;
+              font-weight: bold;
+              font-size: 15pt;
+              margin: 20px 0 10px 0;
               text-transform: uppercase;
             }
-            .kinh-gui {
-              text-align: center;
+            .recipient-line {
               font-weight: bold;
-              margin-bottom: 15pt;
+              margin-bottom: 12px;
+              font-size: 13pt;
+              text-align: center;
             }
-            .content-section {
-              margin-bottom: 10pt;
+            .issue-section {
+              margin-bottom: 15px;
               text-align: justify;
             }
-            .section-label {
-              font-weight: bold;
-            }
-            .footer-table {
+            .content-table {
               width: 100%;
               border-collapse: collapse;
-              margin-top: 25pt;
+              margin-top: 5px;
+              margin-bottom: 20px;
             }
-            .footer-table td {
+            .content-table th, .content-table td {
+              border: 1px solid #000000;
+              padding: 10px 12px;
               vertical-align: top;
+            }
+            .content-table th {
               text-align: center;
-              padding: 5pt;
+              font-weight: bold;
+              background-color: #f5f5f5;
+              font-size: 12pt;
+            }
+            .signature-box {
+              text-align: center;
+              margin-top: 10px;
+            }
+            .signature-title {
+              font-weight: bold;
+              font-size: 12pt;
+            }
+            .signature-subtitle {
+              font-style: italic;
+              font-size: 11pt;
+              margin-bottom: 50px;
+            }
+            .signature-name {
+              font-weight: bold;
+              font-size: 12pt;
+              text-transform: uppercase;
+            }
+            [contenteditable="true"] {
+              outline: none !important;
+              background-color: transparent !important;
             }
           </style>
         </head>
         <body>
-          <table class="header-table">
-            <tr>
-              <td class="header-left">
-                <div>UBND XÃ ĐỊNH MỸ</div>
-                <div class="bold uppercase">PHÒNG ${(phongBan || 'Kinh tế').toUpperCase()}</div>
-                <div>Số: ....../PTr-UBND</div>
-              </td>
-              <td class="header-right">
-                <div class="bold">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
-                <div class="bold">Độc lập - Tự do - Hạnh phúc</div>
-                <div style="font-style: italic; margin-top: 5pt;">${ngayTrinh}</div>
-              </td>
-            </tr>
-          </table>
+          ${pageNode.outerHTML.replace(/contenteditable="true"/gi, '').replace(/contenteditable="false"/gi, '')}
+        </body>
+        </html>
+      `;
 
-          <div class="doc-title">PHIẾU TRÌNH GIẢI QUYẾT CÔNG VIỆC</div>
+      let iframe = document.getElementById('print-a4-iframe');
+      if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.id = 'print-a4-iframe';
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        iframe.style.visibility = 'hidden';
+        document.body.appendChild(iframe);
+      }
 
-          <div class="kinh-gui">Kính gửi: ${noiNhan}${tenLanhDao ? ' - ' + tenLanhDao : ''}</div>
+      const doc = iframe.contentWindow.document;
+      doc.open();
+      doc.write(printHtml);
+      doc.close();
 
-          <div class="content-section">
-            <span class="section-label">1. Vấn đề trình:</span> ${vanDeTrinh}
+      setTimeout(() => {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+      }, 250);
+    } catch (err) {
+      console.error('Lỗi in phiếu:', err);
+      window.print();
+    }
+  };
+
+  const handleExportWord = () => {
+    try {
+      const pageNode = a4PageRef.current;
+      let bodyHtml = pageNode ? pageNode.outerHTML : '';
+      
+      // Remove contenteditable attributes for clean Word document
+      bodyHtml = bodyHtml
+        .replace(/contenteditable="true"/gi, '')
+        .replace(/contenteditable="false"/gi, '');
+
+      const htmlContent = `
+        <html xmlns:o='urn:schemas-microsoft-com:office:office'
+              xmlns:w='urn:schemas-microsoft-com:office:word'
+              xmlns:m='http://schemas.microsoft.com/office/2004/12/omml'
+              xmlns='http://www.w3.org/TR/REC-html40'>
+        <head>
+          <meta charset='utf-8'>
+          <title>Phiếu trình giải quyết công việc</title>
+          <!--[if gte mso 9]>
+          <xml>
+            <w:WordDocument>
+              <w:View>Print</w:View>
+              <w:Zoom>100</w:Zoom>
+              <w:DoNotOptimizeForBrowser/>
+            </w:WordDocument>
+          </xml>
+          <![endif]-->
+          <style>
+            @page Section1 {
+              size: 210mm 297mm;
+              margin: 15mm 15mm 15mm 20mm;
+              mso-header-margin: 36pt;
+              mso-footer-margin: 36pt;
+              mso-paper-source: 0;
+            }
+            div.Section1 {
+              page: Section1;
+            }
+            body {
+              font-family: 'Times New Roman', Times, serif;
+              font-size: 13pt;
+              line-height: 1.35;
+              color: #000000;
+              background-color: #ffffff;
+            }
+            .a4-page {
+              width: 100%;
+              padding: 0;
+              margin: 0;
+              font-family: 'Times New Roman', Times, serif;
+              font-size: 13pt;
+              line-height: 1.35;
+              color: #000000;
+            }
+            .header-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 15px;
+            }
+            .header-table td {
+              vertical-align: top;
+              width: 50%;
+              text-align: center;
+            }
+            .unit-name {
+              font-weight: bold;
+              font-size: 12pt;
+            }
+            .nation-title {
+              font-weight: bold;
+              font-size: 12pt;
+              white-space: nowrap;
+            }
+            .date-text {
+              font-style: italic;
+              font-size: 12pt;
+              margin-top: 4px;
+              white-space: nowrap;
+            }
+            .main-title {
+              text-align: center;
+              font-weight: bold;
+              font-size: 15pt;
+              margin: 20px 0 10px 0;
+              text-transform: uppercase;
+            }
+            .recipient-line {
+              font-weight: bold;
+              margin-bottom: 12px;
+              font-size: 13pt;
+              text-align: center;
+            }
+            .issue-section {
+              margin-bottom: 15px;
+              text-align: justify;
+            }
+            .content-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 5px;
+              margin-bottom: 20px;
+            }
+            .content-table th, .content-table td {
+              border: 1px solid #000000;
+              padding: 10px 12px;
+              vertical-align: top;
+            }
+            .content-table th {
+              text-align: center;
+              font-weight: bold;
+              background-color: #f5f5f5;
+              font-size: 12pt;
+            }
+            .signature-box {
+              text-align: center;
+              margin-top: 10px;
+            }
+            .signature-title {
+              font-weight: bold;
+              font-size: 12pt;
+            }
+            .signature-subtitle {
+              font-style: italic;
+              font-size: 11pt;
+              margin-bottom: 50px;
+            }
+            .signature-name {
+              font-weight: bold;
+              font-size: 12pt;
+              text-transform: uppercase;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="Section1">
+            ${bodyHtml}
           </div>
-
-          <div class="content-section">
-            <span class="section-label">2. Căn cứ trình:</span> ${canCu}
-          </div>
-
-          <div class="content-section">
-            <span class="section-label">3. Thể loại văn bản:</span> ${theLoaiVanBan}
-          </div>
-
-          <div class="content-section">
-            <span class="section-label">4. Tóm tắt nội dung trình / Đề xuất:</span><br/>
-            ${(noiDungVanBan || '').replace(/\n/g, '<br/>')}
-          </div>
-
-          <table class="footer-table">
-            <tr>
-              <td style="width: 33%;">
-                <div class="bold">NƠI NHẬN:</div>
-                <div style="font-size: 11pt; text-align: left; margin-top: 5pt;">
-                  - Như trên;<br/>
-                  - Lưu: VT, ${phongBan || 'Kinh tế'}.
-                </div>
-              </td>
-              <td style="width: 34%;">
-                <div class="bold">Ý KIẾN NỔI BẬT CỦA LÃNH ĐẠO</div>
-                <div style="height: 60pt;"></div>
-              </td>
-              <td style="width: 33%;">
-                <div class="bold">NGƯỜI TRÌNH</div>
-                <div style="font-style: italic; font-size: 11pt;">(Ký, ghi rõ họ tên)</div>
-                <div style="height: 50pt;"></div>
-                <div class="bold">${nguoiTrinh || '..........................'}</div>
-              </td>
-            </tr>
-          </table>
         </body>
         </html>
       `;
@@ -4222,186 +4393,157 @@ function SubmissionPrintModal({ task, onClose, addToast }) {
 
   return (
     <div className="modal-backdrop overflow-y-auto py-6">
-      <div className="modal-content max-w-4xl bg-slate-100 p-0 overflow-hidden shadow-2xl my-auto">
+      <div className="modal-content max-w-5xl bg-slate-900/90 p-0 overflow-hidden shadow-2xl my-auto rounded-2xl border border-slate-700">
         {/* Top Action Bar */}
-        <div className="bg-slate-900 text-white p-4 flex items-center justify-between no-print">
-          <div className="flex items-center gap-2">
-            <i data-lucide="file-text" className="w-5 h-5 text-blue-400"></i>
+        <div className="bg-slate-900 text-white p-4 flex items-center justify-between no-print border-b border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-600/20 border border-blue-500/30 text-blue-400 flex items-center justify-center shrink-0">
+              <Icon name="file-text" className="w-5 h-5" />
+            </div>
             <div>
-              <h3 className="font-bold text-sm text-white">Soạn thảo & In Phiếu trình giải quyết công việc</h3>
-              <p className="text-[11px] text-slate-400">Tùy chỉnh nội dung trực tiếp trước khi in hoặc xuất file Word</p>
+              <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                Soạn thảo & In Phiếu trình giải quyết công việc
+                <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Chuẩn A4</span>
+              </h3>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handlePrint}
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors shadow-xs"
+              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 transition-all shadow-md active:scale-95 cursor-pointer"
             >
-              <i data-lucide="printer" className="w-4 h-4"></i> In phiếu
+              <Icon name="printer" className="w-4 h-4" /> In phiếu
             </button>
             <button
               type="button"
               onClick={handleExportWord}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors shadow-xs"
+              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 transition-all shadow-md active:scale-95 cursor-pointer"
             >
-              <i data-lucide="download" className="w-4 h-4"></i> Xuất Word (.doc)
+              <Icon name="download" className="w-4 h-4" /> Xuất Word (.doc)
             </button>
-            <button type="button" onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white">
-              <i data-lucide="x" className="w-5 h-5"></i>
+            <button type="button" onClick={onClose} className="p-2 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer">
+              <Icon name="x" className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* Printable Document Layout Sheet */}
-        <div className="p-6 md:p-10 space-y-6 overflow-y-auto max-h-[80vh]">
-          <div className="print-a4-sheet bg-white rounded-xl shadow-lg border border-slate-300 p-8 md:p-12 text-slate-900 mx-auto font-serif text-sm leading-relaxed max-w-3xl">
-            {/* Header section */}
-            <div className="grid grid-cols-2 gap-4 pb-6 border-b border-slate-200">
-              <div className="text-center space-y-1">
-                <div className="font-bold text-xs uppercase text-slate-700">UBND XÃ ĐỊNH MỸ</div>
-                <div className="flex items-center justify-center gap-1">
-                  <span className="font-bold text-xs uppercase text-slate-900">PHÒNG:</span>
-                  <input
-                    type="text"
-                    value={phongBan}
-                    onChange={e => setPhongBan(e.target.value)}
-                    className="font-bold text-xs uppercase border-b border-slate-300 focus:border-blue-500 outline-none text-center px-1"
-                  />
-                </div>
-                <div className="text-xs text-slate-500 font-sans">Số: ...../PTr-UBND</div>
-              </div>
-              <div className="text-center space-y-1">
-                <div className="font-bold text-xs uppercase text-slate-900">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
-                <div className="font-bold text-xs text-slate-800">Độc lập - Tự do - Hạnh phúc</div>
-                <div className="pt-1">
-                  <input
-                    type="text"
-                    value={ngayTrinh}
-                    onChange={e => setNgayTrinh(e.target.value)}
-                    className="italic text-xs border-b border-slate-300 focus:border-blue-500 outline-none text-center w-full"
-                  />
-                </div>
-              </div>
+        {/* Editable A4 Sheet Container */}
+        <div className="p-4 md:p-8 overflow-y-auto max-h-[82vh] bg-slate-900/60 flex justify-center">
+          <div className="a4-page shadow-2xl" ref={a4PageRef}>
+            {/* Phần Quốc hiệu & Tên cơ quan */}
+            <table className="header-table">
+              <tbody>
+                <tr>
+                  <td>
+                    <div className="unit-name" contentEditable={true} suppressContentEditableWarning={true}>
+                      UBND XÃ ĐỊNH MỸ
+                    </div>
+                    <div style={{ fontWeight: 'bold' }} contentEditable={true} suppressContentEditableWarning={true}>
+                      PHÒNG {phongBanName}
+                    </div>
+                  </td>
+                  <td>
+                    <div className="nation-title">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+                    <div style={{ fontWeight: 'bold', fontSize: '12pt' }} contentEditable={true} suppressContentEditableWarning={true}>
+                      Độc lập - Tự do - Hạnh phúc
+                    </div>
+                    <div className="date-text" contentEditable={true} suppressContentEditableWarning={true}>
+                      {todayDateStr}
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            {/* Tiêu đề phiếu trình */}
+            <div className="main-title">PHIẾU TRÌNH GIẢI QUYẾT CÔNG VIỆC</div>
+
+            <div className="recipient-line">
+              Kính gửi: <span contentEditable={true} suppressContentEditableWarning={true} style={{ fontWeight: 'normal' }}>{defaultKinhGui}</span>
             </div>
 
-            {/* Title */}
-            <div className="my-6 text-center">
-              <h2 className="font-bold text-lg text-slate-900 uppercase tracking-wide">PHIẾU TRÌNH GIẢI QUYẾT CÔNG VIỆC</h2>
+            {/* Vấn đề trình */}
+            <div className="issue-section">
+              <b>* Vấn đề trình:</b> <span contentEditable={true} suppressContentEditableWarning={true}>{defaultVanDeTrinh}</span>
             </div>
 
-            {/* Interactive Form Fields */}
-            <div className="space-y-4 text-xs md:text-sm">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-slate-900 min-w-[90px]">Kính gửi:</span>
-                <input
-                  type="text"
-                  value={noiNhan}
-                  onChange={e => setNoiNhan(e.target.value)}
-                  placeholder="Nhập nơi nhận (VD: Ủy ban nhân dân tỉnh An Giang)"
-                  className="form-input flex-1 text-xs py-1.5 bg-slate-50 border-slate-300 focus:bg-white font-medium"
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-slate-900 min-w-[90px]">Lãnh đạo:</span>
-                <input
-                  type="text"
-                  value={tenLanhDao}
-                  onChange={e => setTenLanhDao(e.target.value)}
-                  placeholder="Nhập tên Lãnh đạo nhận trình (Để trống nếu gửi chung)"
-                  className="form-input flex-1 text-xs py-1.5 bg-slate-50 border-slate-300 focus:bg-white"
-                />
-              </div>
-
-              <div className="space-y-1 pt-2">
-                <label className="font-bold text-slate-900 block">1. Vấn đề trình:</label>
-                <textarea
-                  value={vanDeTrinh}
-                  onChange={e => setVanDeTrinh(e.target.value)}
-                  rows={2}
-                  className="form-input w-full text-xs p-2 bg-slate-50 border-slate-300 focus:bg-white font-medium leading-normal"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-bold text-slate-900 block">2. Căn cứ trình:</label>
-                <textarea
-                  value={canCu}
-                  onChange={e => setCanCu(e.target.value)}
-                  rows={2}
-                  className="form-input w-full text-xs p-2 bg-slate-50 border-slate-300 focus:bg-white leading-normal"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-bold text-slate-900 block">3. Thể loại văn bản:</label>
-                <input
-                  type="text"
-                  value={theLoaiVanBan}
-                  onChange={e => setTheLoaiVanBan(e.target.value)}
-                  placeholder="Nhập thể loại (Ví dụ: Tờ trình / Công văn / Báo cáo)"
-                  className="form-input w-full text-xs py-1.5 bg-slate-50 border-slate-300 focus:bg-white font-medium"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-bold text-slate-900 block">4. Nội dung tóm tắt trình / Đề xuất:</label>
-                <textarea
-                  value={noiDungVanBan}
-                  onChange={e => setNoiDungVanBan(e.target.value)}
-                  rows={4}
-                  placeholder="Nhập chi tiết nội dung tóm tắt hoặc phương án đề xuất trình Lãnh đạo..."
-                  className="form-input w-full text-xs p-2.5 bg-slate-50 border-slate-300 focus:bg-white leading-relaxed"
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-4 pt-8 text-center text-xs">
-                <div>
-                  <div className="font-bold text-slate-900 uppercase">Nơi nhận</div>
-                  <div className="text-[11px] text-slate-500 text-left pt-2 font-sans space-y-0.5">
-                    <div>- Như trên;</div>
-                    <div>- Lưu: VT, {phongBan}.</div>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="font-bold text-slate-900 uppercase">Ý kiến Lãnh đạo</div>
-                  <div className="h-16 border-b border-dashed border-slate-300 mt-2"></div>
-                </div>
-
-                <div>
-                  <div className="font-bold text-slate-900 uppercase">Người trình</div>
-                  <div className="italic text-[11px] text-slate-400">(Ký, ghi rõ họ tên)</div>
-                  <div className="pt-10">
-                    <input
-                      type="text"
-                      value={nguoiTrinh}
-                      onChange={e => setNguoiTrinh(e.target.value)}
-                      placeholder="Họ tên người trình"
-                      className="font-bold text-xs text-center border-b border-slate-300 focus:border-blue-500 outline-none w-full"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
+            {/* Bảng nội dung và ý kiến bung rộng */}
+            <table className="content-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '58%' }}>NỘI DUNG</th>
+                  <th style={{ width: '42%' }}>Ý KIẾN CỦA VĂN PHÒNG HĐND VÀ UBND</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style={{ textAlign: 'justify' }}>
+                    <div style={{ marginBottom: '10px', textAlign: 'justify' }} contentEditable={true} suppressContentEditableWarning={true}>
+                      <b>- Căn cứ:</b> {defaultCanCu}
+                    </div>
+                    <div style={{ marginBottom: '10px', textAlign: 'justify' }} contentEditable={true} suppressContentEditableWarning={true}>
+                      <b>- Thể loại văn bản:</b> {defaultTheLoai}
+                    </div>
+                    <div style={{ marginBottom: '10px', textAlign: 'justify' }} contentEditable={true} suppressContentEditableWarning={true}>
+                      <b>- Nội dung văn bản:</b> {defaultNoiDungVB}
+                    </div>
+                    <div style={{ textAlign: 'justify' }} contentEditable={true} suppressContentEditableWarning={true}>
+                      <b>- Nơi nhận:</b> {defaultNoiNhan}
+                    </div>
+                  </td>
+                  <td>
+                    {/* Ý kiến văn phòng (các dòng dấu chấm phía trên) */}
+                    <div style={{ marginBottom: '25px', lineHeight: '1.8' }} contentEditable={true} suppressContentEditableWarning={true}>
+                      ..................................................<br />
+                      ..................................................<br />
+                      ..................................................<br />
+                      ..................................................
+                    </div>
+                    
+                    {/* Ngày tháng năm & Ý kiến lãnh đạo UBND xã */}
+                    <div style={{ textAlign: 'center', fontStyle: 'italic', marginBottom: '15px', whiteSpace: 'nowrap' }} contentEditable={true} suppressContentEditableWarning={true}>
+                      Định Mỹ, ngày ... tháng ... năm 2026
+                    </div>
+                    <div style={{ textAlign: 'center', fontWeight: 'bold', marginBottom: '40px' }} contentEditable={true} suppressContentEditableWarning={true}>
+                      Ý KIẾN CỦA LÃNH ĐẠO UBND XÃ
+                    </div>
+                    <div style={{ textAlign: 'center' }} contentEditable={true} suppressContentEditableWarning={true}>
+                      ..................................................
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td colSpan="2" style={{ backgroundColor: '#fbfbfb' }}>
+                    <div style={{ fontWeight: 'bold', textAlign: 'center', marginBottom: '8px' }} contentEditable={true} suppressContentEditableWarning={true}>
+                      ĐỀ XUẤT CỦA CƠ QUAN TRÌNH (NGƯỜI TRÌNH)
+                    </div>
+                    <div style={{ textAlign: 'center', marginBottom: '15px' }} contentEditable={true} suppressContentEditableWarning={true}>
+                      Kính trình lãnh đạo UBND xã ký phát hành Công văn trên.
+                    </div>
+                    <div className="signature-box">
+                      <div className="signature-title" contentEditable={true} suppressContentEditableWarning={true}>Lãnh đạo phòng, đơn vị/người trình</div>
+                      <div className="signature-subtitle" contentEditable={true} suppressContentEditableWarning={true}>(Ký tên, ghi rõ họ tên)</div>
+                      <div style={{ height: '40px' }}></div>
+                      <div className="signature-name" contentEditable={true} suppressContentEditableWarning={true}>{defaultNguoiTrinh}</div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
         {/* Footer controls */}
-        <div className="bg-slate-50 p-4 border-t border-slate-200 flex items-center justify-between no-print">
-          <span className="text-xs text-slate-500 font-sans">
-            Mã công việc: <strong className="text-slate-800">#{task.id}</strong> - Số CV: <strong className="text-blue-600">{task.so_cong_van || '--'}</strong>
+        <div className="bg-slate-900 p-4 border-t border-slate-800 flex items-center justify-between no-print">
+          <span className="text-xs text-slate-400 font-sans flex items-center gap-2">
+            <span>Mã công việc: <strong className="text-slate-200">#{task.id}</strong></span>
+            <span>•</span>
+            <span>Số CV: <strong className="text-blue-400">{task.so_cong_van || '--'}</strong></span>
           </span>
           <div className="flex items-center gap-2">
-            <button type="button" onClick={onClose} className="btn-secondary text-xs">
+            <button type="button" onClick={onClose} className="px-3.5 py-1.5 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-semibold transition-colors cursor-pointer">
               Hủy / Đóng
-            </button>
-            <button type="button" onClick={handleExportWord} className="btn-secondary text-xs text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100 font-semibold inline-flex items-center gap-1.5">
-              <i data-lucide="download" className="w-4 h-4"></i> Xuất Word (.doc)
-            </button>
-            <button type="button" onClick={handlePrint} className="btn-primary text-xs font-semibold inline-flex items-center gap-1.5">
-              <i data-lucide="printer" className="w-4 h-4"></i> In phiếu
             </button>
           </div>
         </div>
