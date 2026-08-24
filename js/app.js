@@ -4437,13 +4437,13 @@ function SubmissionPrintModal({ task, onClose, addToast }) {
                     <div className="unit-name" contentEditable={true} suppressContentEditableWarning={true}>
                       UBND XÃ ĐỊNH MỸ
                     </div>
-                    <div style={{ fontWeight: 'bold' }} contentEditable={true} suppressContentEditableWarning={true}>
+                    <div style={{ fontWeight: 'bold', textDecoration: 'underline' }} contentEditable={true} suppressContentEditableWarning={true}>
                       PHÒNG {phongBanName}
                     </div>
                   </td>
                   <td>
                     <div className="nation-title">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
-                    <div style={{ fontWeight: 'bold', fontSize: '12pt' }} contentEditable={true} suppressContentEditableWarning={true}>
+                    <div style={{ fontWeight: 'bold', fontSize: '12pt', textDecoration: 'underline' }} contentEditable={true} suppressContentEditableWarning={true}>
                       Độc lập - Tự do - Hạnh phúc
                     </div>
                     <div className="date-text" contentEditable={true} suppressContentEditableWarning={true}>
