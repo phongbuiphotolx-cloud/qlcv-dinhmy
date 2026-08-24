@@ -5562,31 +5562,8 @@ function ScheduleView() {
           </div>
         </div>
 
-        {/* Content & Feature Highlights */}
-        <div className="p-6 md:p-8 bg-white space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                <Icon name="calendar-days" className="w-4.5 h-4.5" />
-              </div>
-              <h3 className="font-bold text-sm text-slate-800">Lịch làm việc chi tiết</h3>
-            </div>
-
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
-                <Icon name="globe" className="w-4.5 h-4.5" />
-              </div>
-              <h3 className="font-bold text-sm text-slate-800">Truy cập riêng biệt</h3>
-            </div>
-
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
-                <Icon name="shield-check" className="w-4.5 h-4.5" />
-              </div>
-              <h3 className="font-bold text-sm text-slate-800">An toàn & Bảo mật</h3>
-            </div>
-          </div>
-
+        {/* Content & Action Footer Callout */}
+        <div className="p-6 md:p-8 bg-white">
           {/* Action Footer Callout */}
           <div className="p-4 rounded-xl bg-blue-50/70 border border-blue-100 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
