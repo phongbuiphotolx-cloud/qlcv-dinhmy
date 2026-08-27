@@ -3720,13 +3720,15 @@ function EditTaskModal({ task, categories, employees, onClose, onSubmit }) {
       alert('Vui lòng điền đầy đủ Số công văn và Tên công việc!');
       return;
     }
-    if (!formData.ngay_hoan_thanh || !formData.ngay_hoan_thanh.trim()) {
-      alert('Vui lòng nhập Ngày hoàn thành thực tế!');
-      return;
-    }
-    if (!formData.ket_qua || !formData.ket_qua.trim()) {
-      alert('Vui lòng nhập Sản phẩm / Kết quả ban hành!');
-      return;
+    if (formData.trang_thai === 'Hoàn thành') {
+      if (!formData.ngay_hoan_thanh || !formData.ngay_hoan_thanh.trim()) {
+        alert('Khi chọn trạng thái "Hoàn thành", vui lòng nhập Ngày hoàn thành thực tế!');
+        return;
+      }
+      if (!formData.ket_qua || !formData.ket_qua.trim()) {
+        alert('Khi chọn trạng thái "Hoàn thành", vui lòng nhập Sản phẩm / Kết quả ban hành!');
+        return;
+      }
     }
     setIsSubmitting(true);
     try {
@@ -3893,7 +3895,9 @@ function EditTaskModal({ task, categories, employees, onClose, onSubmit }) {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Ngày hoàn thành thực tế *</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Ngày hoàn thành thực tế {formData.trang_thai === 'Hoàn thành' ? '*' : ''}
+                </label>
                 <DateInput
                   value={formData.ngay_hoan_thanh}
                   onChange={val => setFormData({ ...formData, ngay_hoan_thanh: val })}
@@ -3904,14 +3908,15 @@ function EditTaskModal({ task, categories, employees, onClose, onSubmit }) {
 
             {/* Block 5: Sản phẩm / Kết quả ban hành (Textarea) */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Sản phẩm / Kết quả ban hành *</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Sản phẩm / Kết quả ban hành {formData.trang_thai === 'Hoàn thành' ? '*' : ''}
+              </label>
               <textarea
                 rows={3}
                 placeholder="Ví dụ: Báo cáo số 45/BC-STC..."
                 value={formData.ket_qua}
                 onChange={e => setFormData({ ...formData, ket_qua: e.target.value })}
                 className="form-input h-auto py-2"
-                required
               ></textarea>
             </div>
           </div>
