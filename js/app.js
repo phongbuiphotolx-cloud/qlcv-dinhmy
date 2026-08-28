@@ -204,7 +204,9 @@ const ROUTE_MAP = {
   '/danh-muc/trang-thai-cong-viec': 'category-statuses',
   '/danh-muc/cong-chuc': 'category-employees',
   '/danh-muc/tai-khoan': 'category-accounts',
-  '/cai-dat-he-thong': 'settings'
+  '/cai-dat-he-thong': 'settings',
+  '/tro-ly-ai-dat-ten-van-ban': 'doc-naming',
+  '/tro-ly-ai-dat-ten': 'doc-naming'
 };
 
 const TAB_TO_ROUTE = {
@@ -214,6 +216,7 @@ const TAB_TO_ROUTE = {
   'kpi': '/kpi-danh-gia',
   'reports': '/bao-cao-tong-hop',
   'schedule': '/lich-cong-tac',
+  'doc-naming': '/tro-ly-ai-dat-ten',
   'categories': '/danh-muc/noi-ban-hanh',
   'category-agencies': '/danh-muc/noi-ban-hanh',
   'category-statuses': '/danh-muc/trang-thai-cong-viec',
@@ -903,6 +906,7 @@ function App() {
           {activeTab === 'kpi' && <KPIView tasks={visibleTasks} employees={employees} categories={categories} user={user} addToast={addToast} />}
           {activeTab === 'reports' && <ReportsView tasks={visibleTasks} employees={employees} categories={categories} user={user} addToast={addToast} />}
           {activeTab === 'schedule' && <ScheduleView />}
+          {activeTab === 'doc-naming' && <DocNamingView user={user} addToast={addToast} />}
           {isAdmin && activeTab === 'categories' && (
             <CategoriesView
               subTab="category-agencies"
@@ -1034,6 +1038,13 @@ function Sidebar({ activeTab, setActiveTab, user, onLogout, isCollapsed = false,
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
+    {
+      id: 'doc-naming',
+      label: 'Trợ lý AI định danh mã văn bản',
+      labelLine1: 'Trợ lý AI định danh',
+      labelLine2: 'mã văn bản',
+      icon: 'bot'
+    },
     { id: 'tasks', label: 'Quản lý công việc', icon: 'check-square' },
     { id: 'kpi', label: 'Đánh giá công việc', icon: 'award' },
     { id: 'reports', label: 'Báo cáo tổng hợp', icon: 'bar-chart-3' },
@@ -1095,6 +1106,8 @@ function Sidebar({ activeTab, setActiveTab, user, onLogout, isCollapsed = false,
 
         {menuItems.map(item => {
           const active = activeTab === item.id;
+          const isDocNaming = item.id === 'doc-naming';
+
           return (
             <button
               key={item.id}
@@ -1102,13 +1115,32 @@ function Sidebar({ activeTab, setActiveTab, user, onLogout, isCollapsed = false,
               title={isCollapsed ? item.label : undefined}
               className={`w-full flex items-center ${isCollapsed ? 'justify-center px-2 py-3' : 'justify-between px-3.5 py-2.5'} rounded-xl font-medium text-sm transition-all duration-150 ${
                 active
-                  ? 'bg-blue-50 text-blue-600 font-semibold shadow-xs'
+                  ? (isDocNaming
+                      ? 'bg-purple-50 text-purple-700 font-semibold shadow-xs'
+                      : 'bg-blue-50 text-blue-600 font-semibold shadow-xs')
                   : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
               }`}
             >
-              <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
-                <Icon name={item.icon} className={`w-5 h-5 ${active ? 'text-blue-600' : 'text-slate-400'}`} />
-                <span className={isCollapsed ? 'hidden' : 'inline'}>{item.label}</span>
+              <div className={`flex items-center text-left ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
+                <Icon
+                  name={item.icon}
+                  className={`w-5 h-5 shrink-0 ${
+                    active
+                      ? (isDocNaming ? 'text-purple-600' : 'text-blue-600')
+                      : 'text-slate-400'
+                  }`}
+                />
+
+                {!isCollapsed && (
+                  item.labelLine1 && item.labelLine2 ? (
+                    <div className="flex flex-col text-left leading-tight py-0.5">
+                      <span className="text-sm font-semibold block leading-tight">{item.labelLine1}</span>
+                      <span className="text-xs font-medium block leading-tight opacity-90">{item.labelLine2}</span>
+                    </div>
+                  ) : (
+                    <span className="text-left">{item.label}</span>
+                  )
+                )}
               </div>
             </button>
           );
@@ -1304,6 +1336,7 @@ function Topbar({ user, activeTab, setActiveTab, onOpenMobileDrawer, onLogout, d
       case 'kpi': return 'Đánh giá công việc';
       case 'reports': return 'Báo cáo tổng hợp';
       case 'schedule': return 'Lịch công tác';
+      case 'doc-naming': return 'Trợ lý AI định danh mã văn bản';
       case 'categories':
       case 'category-agencies': return 'Quản lý danh mục - Nơi ban hành';
       case 'category-statuses': return 'Quản lý danh mục - Trạng thái công việc';
@@ -1571,6 +1604,13 @@ function MobileDrawer({ isOpen, onClose, activeTab, setActiveTab, user, onLogout
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
+    {
+      id: 'doc-naming',
+      label: 'Trợ lý AI định danh mã văn bản',
+      labelLine1: 'Trợ lý AI định danh',
+      labelLine2: 'mã văn bản',
+      icon: 'bot'
+    },
     { id: 'tasks', label: 'Quản lý công việc', icon: 'check-square' },
     { id: 'kpi', label: 'Đánh giá công việc', icon: 'award' },
     { id: 'reports', label: 'Báo cáo tổng hợp', icon: 'bar-chart-3' },
@@ -1607,17 +1647,40 @@ function MobileDrawer({ isOpen, onClose, activeTab, setActiveTab, user, onLogout
         </div>
 
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {menuItems.map(item => (
-            <button
-              key={item.id}
-              onClick={() => { setActiveTab(item.id); onClose(); }}
-              className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl font-medium text-sm ${activeTab === item.id ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-slate-600'
+          {menuItems.map(item => {
+            const active = activeTab === item.id;
+            const isDocNaming = item.id === 'doc-naming';
+
+            return (
+              <button
+                key={item.id}
+                onClick={() => { setActiveTab(item.id); onClose(); }}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm text-left ${
+                  active
+                    ? (isDocNaming ? 'bg-purple-50 text-purple-700 font-semibold' : 'bg-blue-50 text-blue-600 font-semibold')
+                    : 'text-slate-600'
                 }`}
-            >
-              <i data-lucide={item.icon} className="w-5 h-5"></i>
-              <span>{item.label}</span>
-            </button>
-          ))}
+              >
+                <i
+                  data-lucide={item.icon}
+                  className={`w-5 h-5 shrink-0 ${
+                    active
+                      ? (isDocNaming ? 'text-purple-600' : 'text-blue-600')
+                      : 'text-slate-400'
+                  }`}
+                ></i>
+
+                {item.labelLine1 && item.labelLine2 ? (
+                  <div className="flex flex-col text-left leading-tight py-0.5">
+                    <span className="text-sm font-semibold block leading-tight">{item.labelLine1}</span>
+                    <span className="text-xs font-medium block leading-tight opacity-90">{item.labelLine2}</span>
+                  </div>
+                ) : (
+                  <span className="text-left">{item.label}</span>
+                )}
+              </button>
+            );
+          })}
 
           {isAdmin && (
             <div className="pt-1">
@@ -5743,6 +5806,782 @@ function ScheduleView() {
         </div>
 
       </div>
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------
+// MODAL: TRA CỨU QUY TẮC & 32 MÃ LOẠI VĂN BẢN
+// ----------------------------------------------------------------------
+function DocNamingRulesModal({ isOpen, onClose }) {
+  if (!isOpen) return null;
+
+  const docTypesList = [
+    { code: '01', name: 'Nghị quyết' },
+    { code: '02', name: 'Quyết định' },
+    { code: '03', name: 'Chỉ thị' },
+    { code: '04', name: 'Quy chế' },
+    { code: '05', name: 'Quy định' },
+    { code: '06', name: 'Thông cáo' },
+    { code: '07', name: 'Thông báo' },
+    { code: '08', name: 'Hướng dẫn' },
+    { code: '09', name: 'Chương trình' },
+    { code: '10', name: 'Kế hoạch' },
+    { code: '11', name: 'Phương án' },
+    { code: '12', name: 'Đề án' },
+    { code: '13', name: 'Dự án' },
+    { code: '14', name: 'Báo cáo' },
+    { code: '15', name: 'Tờ trình' },
+    { code: '16', name: 'Giấy ủy quyền' },
+    { code: '17', name: 'Phiếu gửi' },
+    { code: '18', name: 'Phiếu chuyển' },
+    { code: '19', name: 'Phiếu báo' },
+    { code: '20', name: 'Biên bản' },
+    { code: '21', name: 'Hợp đồng' },
+    { code: '22', name: 'Công văn' },
+    { code: '23', name: 'Công điện' },
+    { code: '24', name: 'Bản ghi nhớ' },
+    { code: '25', name: 'Bản thỏa thuận' },
+    { code: '26', name: 'Giấy mời' },
+    { code: '27', name: 'Giấy giới thiệu' },
+    { code: '28', name: 'Giấy nghỉ phép' },
+    { code: '29', name: 'Thư công' },
+    { code: '30', name: 'Bản đồ' },
+    { code: '31', name: 'Bản vẽ kỹ thuật' },
+    { code: '32', name: 'Khác' }
+  ];
+
+  const agencyCodesList = [
+    { code: 'H01.151', name: 'UBND xã Định Mỹ' },
+    { code: 'H01.151.01', name: 'Trung tâm Phục vụ hành chính công xã Định Mỹ' },
+    { code: 'H01.151.02', name: 'Văn phòng HĐND và UBND xã Định Mỹ' },
+    { code: 'H01.151.03', name: 'Phòng Kinh tế xã Định Mỹ' },
+    { code: 'H01.151.04', name: 'Phòng Văn hóa - Xã hội xã Định Mỹ' },
+    { code: 'H01.151.05', name: 'Trung tâm Dịch vụ tổng hợp xã Định Mỹ' }
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animation-fadeIn">
+      <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="bg-[#18224b] text-white px-6 py-4 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center shadow-xs text-white shrink-0">
+              <Icon name="book-open" className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-base tracking-tight uppercase">Tra cứu Quy tắc & 32 Mã loại Văn bản</h3>
+              <p className="text-xs text-blue-200/80">UBND XÃ ĐỊNH MỸ • Chuẩn Quyết định 3470/QĐ-UBND & TT 05/2025/TT-BNV</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
+          >
+            <Icon name="x" className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Content Body */}
+        <div className="p-6 overflow-y-auto space-y-6 text-slate-800 text-sm">
+          {/* Section 1: Agency Codes */}
+          <div>
+            <h4 className="font-extrabold text-blue-900 text-sm uppercase tracking-tight mb-3 flex items-center gap-2">
+              <Icon name="building" className="w-4 h-4 text-blue-600" />
+              1. Danh mục Mã định danh điện tử Cơ quan/Đơn vị (UBND Xã Định Mỹ)
+            </h4>
+            <div className="overflow-hidden border border-slate-200 rounded-xl">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-100 border-b border-slate-200 text-slate-700 font-bold">
+                    <th className="p-3 w-40">Mã định danh</th>
+                    <th className="p-3">Cơ quan / Đơn vị ban hành</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {agencyCodesList.map((item, idx) => (
+                    <tr key={idx} className="hover:bg-blue-50/40 transition-colors">
+                      <td className="p-3 font-mono font-bold text-blue-700">{item.code}</td>
+                      <td className="p-3 font-medium text-slate-800">{item.name}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Section 2: 32 Document Types Grid */}
+          <div>
+            <h4 className="font-extrabold text-blue-900 text-sm uppercase tracking-tight mb-3 flex items-center gap-2">
+              <Icon name="file-text" className="w-4 h-4 text-blue-600" />
+              2. Bảng 32 Mã loại Văn bản chuẩn (Nghị định 30/2020/NĐ-CP)
+            </h4>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 text-xs">
+              {docTypesList.map((dt) => (
+                <div key={dt.code} className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 flex items-center gap-2 hover:border-blue-300 hover:bg-blue-50/50 transition-all">
+                  <span className="w-7 h-7 rounded-lg bg-blue-600 text-white font-mono font-bold flex items-center justify-center shrink-0 text-xs shadow-2xs">
+                    {dt.code}
+                  </span>
+                  <span className="font-semibold text-slate-800 truncate">{dt.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Section 3: Formatting Rules */}
+          <div className="bg-blue-50/60 border border-blue-200/80 rounded-xl p-4 space-y-2 text-xs text-slate-700">
+            <h4 className="font-bold text-blue-900 flex items-center gap-2 text-sm">
+              <Icon name="shield-check" className="w-4 h-4 text-blue-600" />
+              3. Cấu trúc Đặt tên File & Mã định danh Văn bản
+            </h4>
+            <p className="font-mono bg-white p-2 rounded-lg border border-blue-200 text-blue-800 font-bold">
+              [Mã cơ quan].[Năm].[Tháng].[Ngày].[Số].[Ký hiệu cơ quan].[Mã loại].[Mở rộng]
+            </p>
+            <p>• Ví dụ chuẩn: <code className="font-mono font-bold text-blue-700">H01.151.2026.08.25.125.UBND.22.pdf</code></p>
+            <p>• Quy tắc ký hiệu: Với <code className="font-mono font-bold">05/GM-UBND</code>, tách <code className="font-mono text-blue-700 font-bold">GM</code> là Giấy mời (mã 26), lấy <code className="font-mono text-blue-700 font-bold">UBND</code> làm Ký hiệu cơ quan ban hành.</p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="bg-slate-50 border-t border-slate-200 px-6 py-3 flex items-center justify-end shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition-colors"
+          >
+            Đóng cửa sổ
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------
+// 11c. AI DOCUMENT NAMING ASSISTANT VIEW COMPONENT
+// ----------------------------------------------------------------------
+function DocNamingView({ user, addToast }) {
+  const userName = user?.name || 'Quản trị viên Hệ thống';
+  const userInitial = userName.charAt(0).toUpperCase() || 'Q';
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
+
+  const STORAGE_KEY = 'qlcv_doc_naming_messages';
+  const CLEARED_KEY = 'qlcv_doc_naming_cleared';
+
+  const WELCOME_MESSAGE = {
+    id: 'welcome-ai-msg',
+    sender: 'ai',
+    text: 'Xin chào! Tôi là Trợ lý AI Định Mỹ, chuyên hỗ trợ bạn đặt tên file và mã định danh văn bản chuẩn xác theo quy định (QĐ 3470/QĐ-UBND & TT 05/2025/TT-BNV). Bạn có thể gửi ảnh chụp, tài liệu, nhập nội dung văn bản hoặc chọn các gợi ý bên dưới để bắt đầu.',
+    timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+  };
+
+  const [messages, setMessages] = useState(() => {
+    try {
+      const isCleared = localStorage.getItem(CLEARED_KEY);
+      if (isCleared === 'true') return [WELCOME_MESSAGE];
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return [WELCOME_MESSAGE];
+  });
+
+  const [inputPrompt, setInputPrompt] = useState('');
+  const [attachments, setAttachments] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const fileInputRef = useRef(null);
+  const chatBottomRef = useRef(null);
+
+  const scrollToBottom = () => {
+    if (chatBottomRef.current) {
+      chatBottomRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isLoading]);
+
+  // Persist chat history to localStorage
+  useEffect(() => {
+    try {
+      if (messages.length > 0) {
+        localStorage.removeItem(CLEARED_KEY);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+      }
+    } catch (e) {}
+  }, [messages]);
+
+  // Trigger Confirmation Modal for clear chat
+  const handleClearChatRequest = () => {
+    setIsConfirmClearOpen(true);
+  };
+
+  // Perform persistent clear chat on confirmation
+  const handleConfirmClearChat = () => {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      sessionStorage.removeItem(STORAGE_KEY);
+      localStorage.setItem(CLEARED_KEY, 'true');
+    } catch (e) {}
+    setMessages([WELCOME_MESSAGE]);
+    setIsConfirmClearOpen(false);
+    if (addToast) addToast('Đã xóa đoạn chat thành công!', 'success');
+  };
+
+  // Ultra-compact 2 Core Preset Cards
+  const presetCards = [
+    {
+      icon: 'book-open',
+      badge: 'TT 05/2025/TT-BNV',
+      title: 'Tra cứu 32 Mã loại',
+      desc: 'Mở cửa sổ danh mục 32 mã loại văn bản (TT 05/2025/TT-BNV)',
+      action: 'modal'
+    },
+    {
+      icon: 'building',
+      badge: 'Mã H01.151',
+      title: 'Mã định danh Xã',
+      desc: 'Tra cứu mã định danh H01.151 và các phòng ban trực thuộc',
+      prompt: 'Cho tôi biết mã định danh điện tử của UBND xã Định Mỹ và các phòng ban trực thuộc?'
+    }
+  ];
+
+  // Clipboard Paste Handler (Ctrl + V)
+  const handlePaste = (e) => {
+    const clipboardData = e.clipboardData || window.clipboardData;
+    if (!clipboardData || !clipboardData.items) return;
+
+    const items = Array.from(clipboardData.items);
+    for (const item of items) {
+      if (item.type && item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) continue;
+
+        if (file.size > 20 * 1024 * 1024) {
+          if (addToast) addToast('Ảnh dán quá lớn (tối đa 20MB)', 'error');
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          const result = evt.target.result;
+          const base64Data = result.split(',')[1] || '';
+          const mimeType = file.type || 'image/png';
+          const fileName = `Clipboard_Image_${Date.now()}.png`;
+
+          setAttachments(prev => [
+            ...prev,
+            {
+              name: fileName,
+              mimeType: mimeType,
+              data: base64Data,
+              previewUrl: result,
+              size: (file.size / 1024).toFixed(1) + ' KB'
+            }
+          ]);
+
+          if (addToast) addToast('📷 Đã dán ảnh từ bộ nhớ tạm (Clipboard)!', 'success');
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+  };
+
+  const handleFileUpload = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    files.forEach(file => {
+      if (file.size > 20 * 1024 * 1024) {
+        if (addToast) addToast('Tệp quá lớn (tối đa 20MB)', 'error');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const result = evt.target.result;
+        const base64Data = result.split(',')[1] || '';
+        const mimeType = file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
+
+        setAttachments(prev => [
+          ...prev,
+          {
+            name: file.name,
+            mimeType: mimeType,
+            data: base64Data,
+            previewUrl: mimeType.startsWith('image/') ? result : null,
+            size: (file.size / 1024).toFixed(1) + ' KB'
+          }
+        ]);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeAttachment = (index) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSendMessage = async (customPrompt) => {
+    const promptToSend = typeof customPrompt === 'string' ? customPrompt : inputPrompt;
+    if (!promptToSend.trim() && attachments.length === 0) return;
+
+    const userMessage = {
+      id: Date.now().toString(),
+      sender: 'user',
+      text: promptToSend,
+      attachments: [...attachments],
+      timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInputPrompt('');
+    const currentAttachments = [...attachments];
+    setAttachments([]);
+    setIsLoading(true);
+
+    try {
+      const historyPayload = messages.map(m => ({
+        sender: m.sender,
+        text: m.text,
+        attachments: m.attachments ? m.attachments.map(a => ({ mimeType: a.mimeType, data: a.data })) : []
+      }));
+
+      const res = await fetch('/api/ai/doc-naming', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: promptToSend,
+          attachments: currentAttachments.map(a => ({ mimeType: a.mimeType, data: a.data })),
+          history: historyPayload
+        })
+      });
+
+      const data = await res.json();
+      if (data.success && data.text) {
+        setMessages(prev => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            sender: 'ai',
+            text: data.text,
+            timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+          }
+        ]);
+      } else {
+        throw new Error(data.error || 'Không nhận được phản hồi từ hệ thống AI');
+      }
+    } catch (err) {
+      console.error('Error doc naming AI call:', err);
+      setMessages(prev => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          sender: 'ai',
+          text: `⚠️ **Lỗi xử lý**: ${err.message}. Vui lòng thử lại hoặc kiểm tra kết nối mạng.`,
+          timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+        }
+      ]);
+      if (addToast) addToast(err.message, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    if (addToast) addToast('Đã sao chép tên file / nội dung!', 'success');
+  };
+
+  const extractFileName = (text) => {
+    if (!text) return null;
+
+    // 1. Code blocks ```filename ... ``` or ``` ... ```
+    const codeBlockMatch = text.match(/```(?:filename)?\s*\n?\s*(H01\.[0-9a-zA-Z\.\-]+(?:\.pdf|\.docx|\.doc)?)\s*\n?\s*```/i);
+    if (codeBlockMatch) {
+      let fn = codeBlockMatch[1].trim();
+      if (!/\.(pdf|docx|doc)$/i.test(fn)) fn += '.pdf';
+      return fn;
+    }
+
+    // 2. Full filename ending with extension .pdf / .docx / .doc
+    const extMatch = text.match(/(H01\.[0-9a-zA-Z\.\-]+\.(?:pdf|docx|doc))/i);
+    if (extMatch) {
+      return extMatch[1].trim();
+    }
+
+    // 3. Full multi-part identifier e.g. H01.151.2026.08.25.125.UBND.22 or H01.151.02.2026.08.20.03.VP.10
+    const fullIdMatch = text.match(/(H01\.[0-9a-zA-Z]+(?:\.[0-9a-zA-Z]+){4,}(?:\.pdf|\.docx|\.doc)?)/i);
+    if (fullIdMatch) {
+      let fn = fullIdMatch[1].trim().replace(/\.$/, '');
+      if (!/\.(pdf|docx|doc)$/i.test(fn)) fn += '.pdf';
+      return fn;
+    }
+
+    // 4. H01. pattern containing a 4-digit year (e.g. 2026)
+    const yearMatch = text.match(/(H01\.[0-9a-zA-Z\.\-]*20[2-3][0-9][0-9a-zA-Z\.\-]*)/i);
+    if (yearMatch) {
+      let fn = yearMatch[1].trim().replace(/\.$/, '');
+      if (!/\.(pdf|docx|doc)$/i.test(fn)) fn += '.pdf';
+      return fn;
+    }
+
+    return null;
+  };
+
+  const renderAiTextContent = (text) => {
+    const fileName = extractFileName(text);
+
+    if (fileName) {
+      let explanation = null;
+      const expMatch = text.match(/\*\((.*?)\)\*/s) || text.match(/\((Đã kiểm tra.*?)\)/s);
+      if (expMatch) {
+        explanation = expMatch[1].trim();
+      } else {
+        explanation = "Đã kiểm tra đầy đủ các thành phần theo chuẩn Nghị định 30/2020/NĐ-CP & TT 05/2025/TT-BNV";
+      }
+
+      return (
+        <div className="space-y-3">
+          <p className="font-bold text-slate-800 text-sm">Tên file đề xuất:</p>
+          
+          {/* Filename box with Copy button matching Image 2 */}
+          <div className="bg-[#f0f4ff] border border-blue-200/90 rounded-xl p-3 flex items-center justify-between gap-3 shadow-2xs">
+            <code className="text-sm font-mono font-bold text-[#2563eb] select-all truncate block">
+              {fileName}
+            </code>
+            <button
+              type="button"
+              onClick={() => copyToClipboard(fileName)}
+              className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-100 transition-colors shrink-0 cursor-pointer"
+              title="Sao chép tên file"
+            >
+              <Icon name="copy" className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Explanation line matching Image 2 */}
+          <p className="text-xs text-slate-600 italic leading-relaxed">
+            *({explanation.startsWith('Đã') ? explanation : `Đã kiểm tra đầy đủ các thành phần: ${explanation}`})*
+          </p>
+        </div>
+      );
+    }
+
+    if (window.marked && typeof window.marked.parse === 'function') {
+      try {
+        return <div className="prose prose-slate prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: window.marked.parse(text) }} />;
+      } catch (e) {}
+    }
+    return <p className="whitespace-pre-wrap text-sm text-slate-800">{text}</p>;
+  };
+
+  return (
+    <div
+      className="flex flex-col h-[calc(100vh-5.5rem)] max-w-6xl mx-auto bg-white rounded-2xl shadow-[0_10px_25px_-5px_rgba(0,0,0,0.08),0_8px_10px_-6px_rgba(0,0,0,0.04)] border border-slate-200/90 overflow-hidden"
+      onPaste={handlePaste}
+    >
+      {/* 1. MASTER HEADER BANNER (Top of Floating Card) */}
+      <div className="bg-[#18224b] text-white p-3.5 md:p-4 shrink-0 border-b border-blue-900/40">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-600/90 backdrop-blur-xs flex items-center justify-center shadow-xs text-white shrink-0">
+              <Icon name="sparkles" className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="font-extrabold text-white text-sm md:text-base uppercase tracking-tight">TRỢ LÝ AI ĐẶT TÊN FILE & MÃ ĐỊNH DANH</h2>
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/40">
+                  Gemini API 3.6 Flash
+                </span>
+              </div>
+              <p className="text-[11px] md:text-xs text-blue-200/80 mt-0.5">
+                UBND XÃ ĐỊNH MỸ, TỈNH AN GIANG • QĐ 3470/QĐ-UBND & TT 05/2025/TT-BNV
+              </p>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-semibold backdrop-blur-xs transition-all shadow-2xs cursor-pointer"
+            >
+              <Icon name="search" className="w-4 h-4" />
+              <span>Tra cứu quy tắc & Mã 32</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleClearChatRequest}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/20 hover:bg-red-600/40 border border-red-400/30 text-white text-xs font-semibold backdrop-blur-xs transition-all shadow-2xs cursor-pointer"
+              title="Xóa toàn bộ tin nhắn đoạn chat"
+            >
+              <Icon name="trash-2" className="w-4 h-4" />
+              <span>Xóa đoạn chat</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. CHAT MESSAGES BODY (Inside Card with subtle slate background) */}
+      <div className="flex-1 overflow-y-auto space-y-4 p-4 bg-slate-50/60">
+        {messages.map((msg) => {
+          const isUser = msg.sender === 'user';
+
+          return (
+            <div
+              key={msg.id}
+              className={`flex items-start gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'} max-w-4xl ${isUser ? 'ml-auto' : 'mr-auto'}`}
+            >
+              {/* Avatar Icon */}
+              <div
+                className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs ${
+                  isUser
+                    ? 'bg-[#3b59df] text-white'
+                    : 'bg-[#3b59df] text-white'
+                }`}
+              >
+                {isUser ? (
+                  <span className="text-sm font-extrabold">{userInitial}</span>
+                ) : (
+                  <Icon name="bot" className="w-5 h-5 text-white" />
+                )}
+              </div>
+
+              {/* Bubble Card */}
+              <div
+                className={`flex-1 rounded-2xl p-4 shadow-2xs ${
+                  isUser
+                    ? 'bg-[#3b59df] text-white rounded-tr-xs'
+                    : 'bg-white border border-slate-200/90 text-slate-800 rounded-tl-xs'
+                }`}
+              >
+                <div className={`flex items-center justify-between text-xs mb-2 ${isUser ? 'text-blue-100' : 'text-slate-400'}`}>
+                  <span className="font-semibold">{isUser ? userName : 'Trợ lý AI Định Mỹ'}</span>
+                  <span className="text-[11px]">{msg.timestamp}</span>
+                </div>
+
+                {isUser && msg.attachments && msg.attachments.length > 0 && (
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    {msg.attachments.map((att, idx) => (
+                      <div key={idx} className="flex items-center gap-2 bg-blue-700/60 rounded-lg p-1.5 text-xs text-white">
+                        {att.previewUrl ? (
+                          <img src={att.previewUrl} alt={att.name} className="w-10 h-10 object-cover rounded" />
+                        ) : (
+                          <Icon name="file-text" className="w-4 h-4 text-blue-200" />
+                        )}
+                        <span className="truncate max-w-[150px] font-medium">{att.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {isUser ? (
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.text}</p>
+                ) : (
+                  renderAiTextContent(msg.text)
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        {isLoading && (
+          <div className="flex items-start gap-3 max-w-xl">
+            <div className="w-9 h-9 rounded-xl bg-[#3b59df] text-white flex items-center justify-center shrink-0 shadow-2xs">
+              <Icon name="bot" className="w-5 h-5 animate-pulse" />
+            </div>
+            <div className="bg-white border border-slate-200/90 rounded-2xl rounded-tl-xs p-4 shadow-2xs flex items-center gap-3">
+              <Spinner className="w-4 h-4 text-blue-600" />
+              <span className="text-xs font-medium text-slate-600 animate-pulse">
+                Đang đọc văn bản và phân tích quy chuẩn mã định danh...
+              </span>
+            </div>
+          </div>
+        )}
+
+        <div ref={chatBottomRef} />
+      </div>
+
+      {/* 3. FOOTER CONTROLS & INPUT BAR (Bottom of Floating Card) */}
+      <div className="bg-white border-t border-slate-200/80 p-3 shrink-0 space-y-2">
+        {/* Ultra-thin 2 Core Preset Micro-Cards Grid */}
+        {messages.length <= 2 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {presetCards.map((card, idx) => (
+              <div
+                key={idx}
+                onClick={() => {
+                  if (card.action === 'modal') setIsModalOpen(true);
+                  else if (card.prompt) handleSendMessage(card.prompt);
+                }}
+                className="group py-1 px-2.5 rounded-lg border border-slate-200/80 bg-slate-50/70 hover:border-blue-500 hover:bg-blue-50/60 shadow-2xs hover:shadow-xs transition-all cursor-pointer flex items-center gap-2"
+                title={card.desc}
+              >
+                <div className="w-6 h-6 rounded-md bg-white text-blue-600 font-bold flex items-center justify-center shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-colors border border-blue-100/80 shadow-2xs">
+                  <Icon name={card.icon} className="w-3.5 h-3.5" />
+                </div>
+                <div className="min-w-0 flex-1 flex items-center justify-between gap-1">
+                  <h4 className="font-bold text-slate-800 text-[11px] truncate group-hover:text-blue-700 transition-colors">
+                    {card.title}
+                  </h4>
+                  <span className="text-[9px] font-semibold text-slate-400 shrink-0">
+                    {card.badge}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Attachments Preview Area */}
+        {attachments.length > 0 && (
+          <div className="bg-slate-100/90 p-2 rounded-xl border border-slate-200 flex items-center gap-3 overflow-x-auto">
+            <span className="text-xs font-bold text-slate-600 shrink-0">Đã đính kèm ({attachments.length}):</span>
+            {attachments.map((att, idx) => (
+              <div key={idx} className="relative flex items-center gap-2 bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs text-slate-700 shrink-0">
+                {att.previewUrl ? (
+                  <img src={att.previewUrl} alt={att.name} className="w-7 h-7 object-cover rounded" />
+                ) : (
+                  <Icon name="file-text" className="w-4 h-4 text-blue-600" />
+                )}
+                <div className="min-w-0">
+                  <p className="font-semibold truncate max-w-[120px]">{att.name}</p>
+                  <span className="text-[10px] text-slate-400">{att.size}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeAttachment(idx)}
+                  className="ml-1 text-slate-400 hover:text-red-600 transition-colors p-0.5 rounded"
+                >
+                  <Icon name="x" className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Input Bar Form */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSendMessage();
+          }}
+          className="flex items-center gap-2 bg-slate-50/80 rounded-2xl p-2 border border-slate-200/90 focus-within:border-blue-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-100 transition-all shadow-2xs"
+        >
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            accept="image/*,.pdf,.doc,.docx,.txt"
+            multiple
+            className="hidden"
+          />
+          
+          {/* Attachment Paperclip Button */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current && fileInputRef.current.click()}
+            className="w-9 h-9 rounded-xl bg-white hover:bg-slate-100 text-slate-600 flex items-center justify-center transition-colors shrink-0 border border-slate-200/80 shadow-2xs ml-0.5"
+            title="Đính kèm tệp văn bản hoặc ảnh chụp"
+          >
+            <Icon name="paperclip" className="w-4.5 h-4.5" />
+          </button>
+
+          {/* Text Input with Paste Support */}
+          <input
+            type="text"
+            value={inputPrompt}
+            onChange={(e) => setInputPrompt(e.target.value)}
+            onPaste={handlePaste}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+              }
+            }}
+            placeholder="Nhập nội dung văn bản, số/ký hiệu, dán ảnh (Ctrl+V) hoặc đính kèm PDF..."
+            disabled={isLoading}
+            className="flex-1 border-0 focus:outline-none focus:ring-0 text-sm text-slate-800 placeholder:text-slate-400 bg-transparent px-2"
+          />
+
+          {/* Send AI Button (Inset inside container with rounded-xl 4 sides) */}
+          {(() => {
+            const hasData = Boolean(inputPrompt.trim() || attachments.length > 0);
+            const isButtonDisabled = isLoading || !hasData;
+
+            return (
+              <button
+                type="submit"
+                disabled={isButtonDisabled}
+                className={`px-4 py-2 mr-0.5 rounded-xl font-extrabold text-sm flex items-center gap-2 transition-all duration-200 shrink-0 ${
+                  isButtonDisabled
+                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300/40 opacity-75'
+                    : 'bg-[#8382f6] hover:bg-[#7170f5] text-white shadow-md shadow-indigo-400/30 active:scale-95 cursor-pointer'
+                }`}
+                title={hasData ? 'Gửi cho Trợ lý AI' : 'Vui lòng nhập nội dung hoặc đính kèm tệp để gửi'}
+              >
+                <svg className="w-4 h-4 text-white fill-none stroke-current stroke-2" viewBox="0 0 24 24">
+                  <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+                </svg>
+                <span>Gửi AI</span>
+              </button>
+            );
+          })()}
+        </form>
+      </div>
+
+      {/* Modal 32 Mã loại Văn bản */}
+      <DocNamingRulesModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+
+      {/* Confirmation Dialog Popup for Clear Chat */}
+      {isConfirmClearOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 transform transition-all space-y-4">
+            <div className="flex items-center gap-3 text-amber-600">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0 border border-amber-100">
+                <Icon name="alert-triangle" className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-slate-800 text-base">Xác nhận xóa đoạn chat</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Thao tác này không thể hoàn tác</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-200/80">
+              Bạn có chắc chắn muốn xóa toàn bộ lịch sử đoạn chat này không? Tất cả các tin nhắn và tài liệu đính kèm trong phiên làm việc hiện tại sẽ bị xóa sạch.
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsConfirmClearOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmClearChat}
+                className="px-4 py-2 rounded-xl text-xs font-extrabold text-white bg-red-600 hover:bg-red-700 shadow-md shadow-red-500/20 active:scale-95 transition-all cursor-pointer inline-flex items-center gap-1.5"
+              >
+                <Icon name="trash-2" className="w-3.5 h-3.5" />
+                <span>Xác nhận xóa</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
