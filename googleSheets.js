@@ -511,9 +511,10 @@ async function getData(forceRefresh = false) {
       });
     }
 
-    // 3. Parse Settings (Đọc đầy đủ tất cả phòng ban từ Cột A bắt đầu từ hàng 4)
+    // 3. Parse Settings (Đọc đầy đủ tất cả phòng ban từ Cột A trong dải ô Setting!A4:A50)
     const departments = [];
-    for (let r = 3; r < setRows.length; r++) {
+    const maxDeptRow = Math.min(setRows.length, 50);
+    for (let r = 3; r < maxDeptRow; r++) {
       const val = String(setRows[r]?.[0] || '').trim();
       if (val && !departments.includes(val)) departments.push(val);
     }

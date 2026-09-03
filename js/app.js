@@ -943,6 +943,8 @@ function App() {
               setUser={setUser}
               accounts={accounts}
               setAccounts={setAccounts}
+              categories={categories}
+              onRefresh={refreshDataFromBackend}
               addToast={addToast}
             />
           )}
@@ -7601,35 +7603,47 @@ function CategoriesView({ subTab, categories, setCategories, employees, setEmplo
       )}
 
       {activeCategory === 'accounts' && (
-        <SettingsView user={user} setUser={setUser} accounts={accounts} setAccounts={setAccounts} addToast={addToast} />
+        <SettingsView user={user} setUser={setUser} accounts={accounts} setAccounts={setAccounts} categories={categories} onRefresh={onRefresh} addToast={addToast} />
       )}
     </div>
   );
 }
 
-function SettingsView({ user, setUser, accounts, setAccounts, addToast }) {
+function SettingsView({ user, setUser, accounts, setAccounts, categories, onRefresh, addToast }) {
   const [showAddAccountModal, setShowAddAccountModal] = useState(false);
   const [editingAccount, setEditingAccount] = useState(null);
+
+  // Dynamic department list from categories (Sheet Settings!A4:A50)
+  const departmentOptions = useMemo(() => {
+    let depts = [];
+    if (categories?.departments && Array.isArray(categories.departments) && categories.departments.length > 0) {
+      depts = categories.departments;
+    } else if (window.INITIAL_CATEGORIES?.departments && Array.isArray(window.INITIAL_CATEGORIES.departments)) {
+      depts = window.INITIAL_CATEGORIES.departments;
+    } else {
+      depts = ['Kinh tế', 'VH - XH', 'Văn phòng UBND', 'Nội vụ', 'Tài chính', 'Tư pháp', 'Quản lý đô thị', 'Tài nguyên & Môi trường'];
+    }
+    // Filter out blank/whitespace entries and deduplicate
+    const cleanDepts = depts
+      .map(d => String(d || '').trim())
+      .filter(Boolean);
+    return Array.from(new Set(cleanDepts));
+  }, [categories]);
 
   const [formData, setFormData] = useState({
     username: '',
     password: '',
-    department: 'Kinh tế',
+    department: '',
     role: 'EDIT',
     name: ''
   });
 
-  const departmentOptions = [
-    'ALL',
-    'Kinh tế',
-    'VH - XH',
-    'Văn phòng UBND',
-    'Nội vụ',
-    'Tài chính',
-    'Tư pháp',
-    'Quản lý đô thị',
-    'Tài nguyên & Môi trường'
-  ];
+  // Ensure formData has default department when options load
+  useEffect(() => {
+    if (!formData.department && departmentOptions.length > 0) {
+      setFormData(prev => ({ ...prev, department: departmentOptions[0] }));
+    }
+  }, [departmentOptions]);
 
   const handleCreateAccount = async (e) => {
     e.preventDefault();
@@ -7643,17 +7657,19 @@ function SettingsView({ user, setUser, accounts, setAccounts, addToast }) {
       return;
     }
 
+    const selectedDept = formData.department || departmentOptions[0] || 'Kinh tế';
+
     const newAcc = {
       username: cleanUser,
       password: formData.password.trim(),
-      department: formData.department,
+      department: selectedDept,
       role: formData.role,
-      name: formData.name.trim() || `Cán bộ ${formData.department}`
+      name: formData.name.trim() || `Cán bộ ${selectedDept}`
     };
 
     setAccounts([...accounts, newAcc]);
     setShowAddAccountModal(false);
-    setFormData({ username: '', password: '', department: 'Kinh tế', role: 'EDIT', name: '' });
+    setFormData({ username: '', password: '', department: departmentOptions[0] || 'Kinh tế', role: 'EDIT', name: '' });
 
     try {
       const res = await fetch('/api/add', {
@@ -7885,7 +7901,7 @@ function SettingsView({ user, setUser, accounts, setAccounts, addToast }) {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold uppercase text-slate-700 mb-1">Phòng ban (Cột M) *</label>
+                  <label className="block text-xs font-bold uppercase text-slate-700 mb-1">Phòng ban *</label>
                   <select
                     value={formData.department}
                     onChange={e => setFormData({ ...formData, department: e.target.value })}
@@ -7957,7 +7973,7 @@ function SettingsView({ user, setUser, accounts, setAccounts, addToast }) {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold uppercase text-slate-700 mb-1">Phòng ban (Cột M) *</label>
+                  <label className="block text-xs font-bold uppercase text-slate-700 mb-1">Phòng ban *</label>
                   <select
                     value={editingAccount.department}
                     onChange={e => setEditingAccount({ ...editingAccount, department: e.target.value })}
