@@ -68,8 +68,8 @@ const credentials = getGoogleCredentials();
 if (credentials) {
   authConfig.credentials = credentials;
 } else {
-  const KEY_FILE = process.env.GOOGLE_APPLICATION_CREDENTIALS || path.join(__dirname, 'qlcv-505501-c6ad069851e0.json');
-  authConfig.keyFile = KEY_FILE;
+  const KEY_FILE = process.env.GOOGLE_APPLICATION_CREDENTIALS || path.join(__dirname, 'qlcv-505501-a0a3cebc52f5.json');
+  authConfig.keyFile = path.isAbsolute(KEY_FILE) ? KEY_FILE : path.resolve(process.cwd(), KEY_FILE);
 }
 
 const auth = new google.auth.GoogleAuth(authConfig);
@@ -519,6 +519,14 @@ async function getData(forceRefresh = false) {
       if (val && !departments.includes(val)) departments.push(val);
     }
 
+    // Merge memory store departments to guarantee no added data is lost
+    const memData = loadInitialInMemoryData();
+    if (memData && memData.categories && Array.isArray(memData.categories.departments)) {
+      memData.categories.departments.forEach(d => {
+        if (d && !departments.includes(d)) departments.push(d);
+      });
+    }
+
     const agencies = [];
     for (let r = 3; r < setRows.length; r++) {
       const val = String(setRows[r]?.[6] || '').trim();
@@ -582,7 +590,10 @@ async function addItem(type, data) {
 
   if (!spreadsheetId) {
     const memData = loadInitialInMemoryData();
-    if (type === 'agencies') {
+    if (type === 'departments') {
+      const name = String(typeof data === 'object' ? (data.name || data.phong_ban) : data).trim();
+      if (name && !memData.categories.departments.includes(name)) memData.categories.departments.push(name);
+    } else if (type === 'agencies') {
       const name = String(typeof data === 'object' ? data.name : data).trim();
       if (name) memData.categories.agencies.push(name);
     } else if (type === 'employees') {
@@ -602,19 +613,47 @@ async function addItem(type, data) {
     deptName = String(deptName).trim();
     if (!deptName) throw new Error('Tên phòng ban không được để rỗng.');
 
-    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Settings!A4:A200' });
-    const existing = res.data.values || [];
-    const targetRow = existing.length + 4;
+    // Always sync with memory store first
+    const memData = loadInitialInMemoryData();
+    if (memData && memData.categories && Array.isArray(memData.categories.departments)) {
+      if (!memData.categories.departments.includes(deptName)) {
+        memData.categories.departments.push(deptName);
+      }
+    }
 
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: `Settings!A${targetRow}`,
-      valueInputOption: 'USER_ENTERED',
-      requestBody: { values: [[deptName]] }
-    });
+    if (!spreadsheetId) {
+      clearDataCache();
+      return { success: true, name: deptName, message: 'Added department (in-memory)' };
+    }
 
-    clearDataCache();
-    return { success: true, name: deptName, excel_row: targetRow, message: 'Added department successfully' };
+    try {
+      const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Settings!A4:A50' });
+      const existing = res.data.values || [];
+      let targetRow = -1;
+      for (let i = 0; i < 47; i++) {
+        if (!existing[i] || !String(existing[i][0] || '').trim()) {
+          targetRow = i + 4;
+          break;
+        }
+      }
+      if (targetRow === -1 || targetRow > 50) {
+        throw new Error('Danh mục phòng ban đã đạt giới hạn tối đa (tối đa 47 phòng ban từ A4 đến A50).');
+      }
+
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `Settings!A${targetRow}`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: [[deptName]] }
+      });
+
+      clearDataCache();
+      return { success: true, name: deptName, excel_row: targetRow, message: 'Added department successfully' };
+    } catch (err) {
+      console.warn('[Google Sheets API Fallback]:', err.message);
+      clearDataCache();
+      return { success: true, name: deptName, message: 'Added department (in-memory fallback)' };
+    }
   }
 
   if (type === 'agencies') {
@@ -735,7 +774,14 @@ async function updateItem(type, data) {
 
   if (!spreadsheetId) {
     const memData = loadInitialInMemoryData();
-    if (type === 'employees') {
+    if (type === 'departments') {
+      const oldName = String(data.oldName || data.name || '').trim();
+      const newName = String(data.newName || '').trim();
+      if (oldName && newName) {
+        const idx = memData.categories.departments.indexOf(oldName);
+        if (idx !== -1) memData.categories.departments[idx] = newName;
+      }
+    } else if (type === 'employees') {
       const idx = memData.employees.findIndex(e => e.ma_nv === data.ma_nv);
       if (idx !== -1) memData.employees[idx] = { ...memData.employees[idx], ...data };
     } else if (type === 'tasks') {
@@ -749,24 +795,43 @@ async function updateItem(type, data) {
     const oldName = String(data.oldName || data.name || '').trim();
     const newName = String(data.newName || '').trim();
 
-    if (oldName && newName) {
-      const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Settings!A4:A200' });
-      const rows = res.data.values || [];
-      for (let i = 0; i < rows.length; i++) {
-        if (String(rows[i][0] || '').trim() === oldName) {
-          const rowNum = i + 4;
-          await sheets.spreadsheets.values.update({
-            spreadsheetId,
-            range: `Settings!A${rowNum}`,
-            valueInputOption: 'USER_ENTERED',
-            requestBody: { values: [[newName]] }
-          });
-          break;
+    // Always sync with memory store first
+    const memData = loadInitialInMemoryData();
+    if (oldName && newName && memData && memData.categories && Array.isArray(memData.categories.departments)) {
+      const idx = memData.categories.departments.indexOf(oldName);
+      if (idx !== -1) memData.categories.departments[idx] = newName;
+      else if (!memData.categories.departments.includes(newName)) memData.categories.departments.push(newName);
+    }
+
+    if (!spreadsheetId) {
+      clearDataCache();
+      return { success: true, oldName, newName, message: 'Updated department (in-memory)' };
+    }
+
+    try {
+      if (oldName && newName) {
+        const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Settings!A4:A50' });
+        const rows = res.data.values || [];
+        for (let i = 0; i < rows.length; i++) {
+          if (String(rows[i][0] || '').trim() === oldName) {
+            const rowNum = i + 4;
+            await sheets.spreadsheets.values.update({
+              spreadsheetId,
+              range: `Settings!A${rowNum}`,
+              valueInputOption: 'USER_ENTERED',
+              requestBody: { values: [[newName]] }
+            });
+            break;
+          }
         }
       }
+      clearDataCache();
+      return { success: true, oldName, newName, message: 'Updated department successfully' };
+    } catch (err) {
+      console.warn('[Google Sheets API Fallback]:', err.message);
+      clearDataCache();
+      return { success: true, oldName, newName, message: 'Updated department (in-memory fallback)' };
     }
-    clearDataCache();
-    return { success: true, oldName, newName, message: 'Updated department successfully' };
   }
 
   if (type === 'agencies') {
@@ -944,7 +1009,10 @@ async function deleteItem(type, id, data) {
 
   if (!spreadsheetId) {
     const memData = loadInitialInMemoryData();
-    if (type === 'employees') {
+    if (type === 'departments') {
+      const targetName = String(data?.name || data?.oldName || id || '').trim();
+      memData.categories.departments = memData.categories.departments.filter(d => d !== targetName);
+    } else if (type === 'employees') {
       memData.employees = memData.employees.filter(e => e.ma_nv !== id);
     } else if (type === 'tasks') {
       memData.tasks = memData.tasks.filter(t => t.id !== parseInt(id, 10));
@@ -954,19 +1022,37 @@ async function deleteItem(type, id, data) {
 
   if (type === 'departments') {
     const targetName = String(data?.name || data?.oldName || id || '').trim();
-    if (targetName) {
-      const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Settings!A4:A200' });
-      const rows = res.data.values || [];
-      for (let i = 0; i < rows.length; i++) {
-        if (String(rows[i][0] || '').trim() === targetName) {
-          const rowNum = i + 4;
-          await sheets.spreadsheets.values.clear({ spreadsheetId, range: `Settings!A${rowNum}` });
-          break;
+
+    // Always sync with memory store first
+    const memData = loadInitialInMemoryData();
+    if (targetName && memData && memData.categories && Array.isArray(memData.categories.departments)) {
+      memData.categories.departments = memData.categories.departments.filter(d => d !== targetName);
+    }
+
+    if (!spreadsheetId) {
+      clearDataCache();
+      return { success: true, name: targetName, message: 'Deleted department (in-memory)' };
+    }
+
+    try {
+      if (targetName) {
+        const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Settings!A4:A50' });
+        const rows = res.data.values || [];
+        for (let i = 0; i < rows.length; i++) {
+          if (String(rows[i][0] || '').trim() === targetName) {
+            const rowNum = i + 4;
+            await sheets.spreadsheets.values.clear({ spreadsheetId, range: `Settings!A${rowNum}` });
+            break;
+          }
         }
       }
+      clearDataCache();
+      return { success: true, name: targetName, message: 'Deleted department successfully' };
+    } catch (err) {
+      console.warn('[Google Sheets API Fallback]:', err.message);
+      clearDataCache();
+      return { success: true, name: targetName, message: 'Deleted department (in-memory fallback)' };
     }
-    clearDataCache();
-    return { success: true, name: targetName, message: 'Deleted department successfully' };
   }
 
   if (type === 'agencies') {

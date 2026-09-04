@@ -19,9 +19,10 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Logging middleware
+// Logging & UTF-8 Encoding middleware
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     console.log(`[API ${req.method}] ${req.path}`);
   }
   next();
@@ -330,6 +331,7 @@ app.use((req, res) => {
     ? path.join(process.cwd(), 'index.html')
     : path.join(__dirname, 'index.html');
 
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.sendFile(indexPath);
 });
 

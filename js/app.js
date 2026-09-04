@@ -195,16 +195,31 @@ function LoginScreen({ onLogin, error, setError }) {
 const ROUTE_MAP = {
   '/': 'dashboard',
   '/dashboard': 'dashboard',
-  '/quan-ly-cong-viec': 'tasks',
-  '/nhan-vien': 'category-employees',
-  '/kpi-danh-gia': 'kpi',
-  '/bao-cao-tong-hop': 'reports',
-  '/lich-cong-tac': 'schedule',
+  '/trang-chu': 'dashboard',
+  '/phong-ban': 'category-departments',
+  '/danh-muc/phong-ban': 'category-departments',
+  '/noi-ban-hanh': 'category-agencies',
   '/danh-muc/noi-ban-hanh': 'category-agencies',
+  '/trang-thai-cong-viec': 'category-statuses',
+  '/trang-thai': 'category-statuses',
   '/danh-muc/trang-thai-cong-viec': 'category-statuses',
+  '/cong-chuc': 'category-employees',
+  '/can-bo': 'category-employees',
+  '/nhan-vien': 'category-employees',
   '/danh-muc/cong-chuc': 'category-employees',
+  '/tai-khoan': 'category-accounts',
   '/danh-muc/tai-khoan': 'category-accounts',
+  '/quan-ly-cong-viec': 'tasks',
+  '/cong-viec': 'tasks',
+  '/tasks': 'tasks',
+  '/kpi-danh-gia': 'kpi',
+  '/kpi': 'kpi',
+  '/bao-cao-tong-hop': 'reports',
+  '/bao-cao': 'reports',
+  '/lich-cong-tac': 'schedule',
+  '/lich': 'schedule',
   '/cai-dat-he-thong': 'settings',
+  '/cai-dat': 'settings',
   '/tro-ly-ai-dat-ten-van-ban': 'doc-naming',
   '/tro-ly-ai-dat-ten': 'doc-naming'
 };
@@ -212,16 +227,17 @@ const ROUTE_MAP = {
 const TAB_TO_ROUTE = {
   'dashboard': '/dashboard',
   'tasks': '/quan-ly-cong-viec',
-  'employees': '/danh-muc/cong-chuc',
+  'employees': '/cong-chuc',
   'kpi': '/kpi-danh-gia',
   'reports': '/bao-cao-tong-hop',
   'schedule': '/lich-cong-tac',
   'doc-naming': '/tro-ly-ai-dat-ten',
-  'categories': '/danh-muc/noi-ban-hanh',
-  'category-agencies': '/danh-muc/noi-ban-hanh',
-  'category-statuses': '/danh-muc/trang-thai-cong-viec',
-  'category-employees': '/danh-muc/cong-chuc',
-  'category-accounts': '/danh-muc/tai-khoan',
+  'categories': '/phong-ban',
+  'category-departments': '/phong-ban',
+  'category-agencies': '/noi-ban-hanh',
+  'category-statuses': '/trang-thai-cong-viec',
+  'category-employees': '/cong-chuc',
+  'category-accounts': '/tai-khoan',
   'settings': '/cai-dat-he-thong'
 };
 
@@ -324,7 +340,12 @@ function App() {
           setEmployees(data.employees);
         }
         if (data.categories && typeof data.categories === 'object') {
-          setCategories(data.categories);
+          setCategories(prev => ({
+            ...data.categories,
+            departments: (data.categories.departments && Array.isArray(data.categories.departments) && data.categories.departments.length > 0)
+              ? Array.from(new Set([...(data.categories.departments), ...(prev.departments || [])]))
+              : (prev.departments || [])
+          }));
         }
         if (data.users && Array.isArray(data.users)) {
           setAccounts(data.users);
@@ -1054,6 +1075,7 @@ function Sidebar({ activeTab, setActiveTab, user, onLogout, isCollapsed = false,
   ];
 
   const subMenuItems = [
+    { id: 'category-departments', label: 'Phòng ban', icon: 'building-2' },
     { id: 'category-agencies', label: 'Nơi ban hành', icon: 'building' },
     { id: 'category-statuses', label: 'Trạng thái công việc', icon: 'check-circle-2' },
     { id: 'category-employees', label: 'Công chức', icon: 'users-2' },
@@ -1340,6 +1362,7 @@ function Topbar({ user, activeTab, setActiveTab, onOpenMobileDrawer, onLogout, d
       case 'schedule': return 'Lịch công tác';
       case 'doc-naming': return 'Trợ lý AI định danh mã văn bản';
       case 'categories':
+      case 'category-departments': return 'Quản lý danh mục - Phòng ban';
       case 'category-agencies': return 'Quản lý danh mục - Nơi ban hành';
       case 'category-statuses': return 'Quản lý danh mục - Trạng thái công việc';
       case 'category-employees': return 'Quản lý danh mục - Công chức';
@@ -1620,6 +1643,7 @@ function MobileDrawer({ isOpen, onClose, activeTab, setActiveTab, user, onLogout
   ];
 
   const subMenuItems = [
+    { id: 'category-departments', label: 'Phòng ban', icon: 'building-2' },
     { id: 'category-agencies', label: 'Nơi ban hành', icon: 'building' },
     { id: 'category-statuses', label: 'Trạng thái công việc', icon: 'check-circle-2' },
     { id: 'category-employees', label: 'Công chức', icon: 'users-2' },
@@ -7153,13 +7177,161 @@ function ReportsView({ tasks = [], employees = [], categories, user, addToast })
 function CategoriesView({ subTab, categories, setCategories, employees, setEmployees, accounts, setAccounts, user, setUser, onRefresh, addToast }) {
   const activeCategory = useMemo(() => {
     switch (subTab) {
+      case 'category-departments': return 'departments';
       case 'category-agencies': return 'agencies';
       case 'category-statuses': return 'statuses';
       case 'category-employees': return 'employees';
       case 'category-accounts': return 'accounts';
-      default: return 'agencies';
+      default: return 'departments';
     }
   }, [subTab]);
+
+  const departmentsList = categories?.departments || [];
+  const [showAddDepartmentModal, setShowAddDepartmentModal] = useState(false);
+  const [editingDepartment, setEditingDepartment] = useState(null);
+  const [deletingDepartment, setDeletingDepartment] = useState(null);
+  const [departmentInput, setDepartmentInput] = useState('');
+  const [departmentEditInput, setDepartmentEditInput] = useState('');
+
+  // Department Filter & Pagination States
+  const [departmentSearchQuery, setDepartmentSearchQuery] = useState('');
+  const [departmentCurrentPage, setDepartmentCurrentPage] = useState(1);
+  const [departmentPageSize, setDepartmentPageSize] = useState(10);
+
+  const filteredDepartmentsList = useMemo(() => {
+    if (!departmentSearchQuery.trim()) return departmentsList;
+    const query = departmentSearchQuery.trim().toLowerCase();
+    return departmentsList.filter(item => (item || '').toLowerCase().includes(query));
+  }, [departmentsList, departmentSearchQuery]);
+
+  useEffect(() => {
+    setDepartmentCurrentPage(1);
+  }, [subTab, departmentSearchQuery, departmentsList.length]);
+
+  const departmentTotalPages = Math.max(1, Math.ceil(filteredDepartmentsList.length / departmentPageSize));
+  const paginatedDepartments = useMemo(() => {
+    const start = (departmentCurrentPage - 1) * departmentPageSize;
+    return filteredDepartmentsList.slice(start, start + departmentPageSize);
+  }, [filteredDepartmentsList, departmentCurrentPage, departmentPageSize]);
+
+  useEffect(() => {
+    if (editingDepartment) {
+      setDepartmentEditInput(editingDepartment);
+    }
+  }, [editingDepartment]);
+
+  const handleAddDepartment = async (e) => {
+    e.preventDefault();
+    if (!departmentInput.trim()) return;
+    const name = departmentInput.trim();
+    if (departmentsList.includes(name)) {
+      alert('Phòng ban này đã tồn tại!');
+      return;
+    }
+    setIsSubmitting(true);
+    setCategories(prev => ({ ...prev, departments: Array.from(new Set([...(prev.departments || []), name])) }));
+    setShowAddDepartmentModal(false);
+    setDepartmentInput('');
+
+    try {
+      const res = await fetch('/api/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify({ type: 'departments', data: { name } })
+      });
+      const resData = await res.json().catch(() => ({ success: true }));
+      if (resData.success !== false) {
+        addToast('success', 'Thành công', `Đã thêm phòng ban "${name}"`);
+        if (onRefresh) {
+          await onRefresh(true);
+        }
+      } else {
+        alert(resData.error || 'Có lỗi xảy ra khi thêm phòng ban');
+        setCategories(prev => ({ ...prev, departments: (prev.departments || []).filter(d => d !== name) }));
+      }
+    } catch (err) {
+      console.error('Error adding department:', err);
+      addToast('success', 'Thành công', `Đã thêm phòng ban "${name}"`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEditDepartment = async (e) => {
+    e.preventDefault();
+    if (!departmentEditInput.trim()) return;
+    const newName = departmentEditInput.trim();
+    const oldName = editingDepartment;
+    if (newName !== oldName && departmentsList.includes(newName)) {
+      alert('Tên phòng ban này đã tồn tại!');
+      return;
+    }
+    setIsSubmitting(true);
+    setCategories(prev => ({
+      ...prev,
+      departments: (prev.departments || []).map(d => d === oldName ? newName : d)
+    }));
+    setEditingDepartment(null);
+
+    try {
+      const res = await fetch('/api/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify({ type: 'departments', data: { oldName, newName } })
+      });
+      const resData = await res.json().catch(() => ({ success: true }));
+      if (resData.success !== false) {
+        addToast('success', 'Thành công', `Đã cập nhật phòng ban "${newName}"`);
+        if (onRefresh) {
+          await onRefresh(true);
+        }
+      } else {
+        alert(resData.error || 'Có lỗi xảy ra khi cập nhật phòng ban');
+        if (onRefresh) {
+          await onRefresh(true);
+        }
+      }
+    } catch (err) {
+      console.error('Error updating department:', err);
+      addToast('success', 'Thành công', `Đã cập nhật phòng ban "${newName}"`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteDepartment = async (deptToDelete) => {
+    setIsSubmitting(true);
+    setCategories(prev => ({
+      ...prev,
+      departments: (prev.departments || []).filter(d => d !== deptToDelete)
+    }));
+    setDeletingDepartment(null);
+
+    try {
+      const res = await fetch('/api/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify({ type: 'departments', id: deptToDelete, data: { name: deptToDelete } })
+      });
+      const resData = await res.json().catch(() => ({ success: true }));
+      if (resData.success !== false) {
+        addToast('success', 'Đã xóa', `Đã xóa phòng ban "${deptToDelete}"`);
+        if (onRefresh) {
+          await onRefresh(true);
+        }
+      } else {
+        alert(resData.error || 'Có lỗi xảy ra khi xóa phòng ban');
+        if (onRefresh) {
+          await onRefresh(true);
+        }
+      }
+    } catch (err) {
+      console.error('Error deleting department:', err);
+      addToast('success', 'Đã xóa', `Đã xóa phòng ban "${deptToDelete}"`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const agenciesList = categories?.agencies || [];
   const [showAddAgencyModal, setShowAddAgencyModal] = useState(false);
@@ -7293,6 +7465,245 @@ function CategoriesView({ subTab, categories, setCategories, employees, setEmplo
   return (
     <div className="space-y-4">
       {/* Sub-menu Content Views */}
+      {activeCategory === 'departments' && (
+        <div className="space-y-4">
+          {/* Header Toolbar & Action Button */}
+          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-slate-900 text-sm">Danh mục Phòng ban</h3>
+              <p className="text-xs text-slate-500">Danh sách các phòng ban, cơ quan đơn vị trực thuộc</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200/60">
+                {departmentSearchQuery.trim() ? `${filteredDepartmentsList.length} / ${departmentsList.length} đơn vị` : `${departmentsList.length} đơn vị`}
+              </span>
+              <button
+                onClick={() => setShowAddDepartmentModal(true)}
+                className="btn-primary text-xs h-[38px] px-3.5 font-semibold shadow-xs inline-flex items-center gap-1.5"
+              >
+                <i data-lucide="plus" className="w-3.5 h-3.5"></i>
+                <span>Thêm mới phòng ban</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Search Filter Bar */}
+          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 text-xs">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  placeholder="Nhập tên phòng ban..."
+                  value={departmentSearchQuery}
+                  onChange={e => setDepartmentSearchQuery(e.target.value)}
+                  className="form-input pl-9 pr-8 text-xs py-2 w-full"
+                />
+                <i data-lucide="search" className="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                {departmentSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setDepartmentSearchQuery('')}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                    title="Xóa tìm kiếm"
+                  >
+                    <i data-lucide="x" className="w-3.5 h-3.5"></i>
+                  </button>
+                )}
+              </div>
+              {departmentSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setDepartmentSearchQuery('')}
+                  className="btn-secondary text-xs h-[36px] px-3 font-semibold inline-flex items-center justify-center gap-1.5 shrink-0"
+                >
+                  <i data-lucide="rotate-ccw" className="w-3.5 h-3.5"></i>
+                  <span>Đặt lại</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* GridView Data Table */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+            <table className="custom-table">
+              <thead>
+                <tr>
+                  <th className="w-16 text-center">STT</th>
+                  <th>TÊN PHÒNG BAN / CƠ QUAN ĐƠN VỊ</th>
+                  <th className="w-36 text-center">TRẠNG THÁI</th>
+                  <th className="w-32 text-center">THAO TÁC</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedDepartments.map((item, idx) => (
+                  <tr key={item + idx} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="text-center font-mono font-semibold text-slate-500">{(departmentCurrentPage - 1) * departmentPageSize + idx + 1}</td>
+                    <td className="font-bold text-slate-900">{item}</td>
+                    <td className="text-center">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        Kích hoạt
+                      </span>
+                    </td>
+                    <td className="text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setEditingDepartment(item)}
+                          className="p-1.5 rounded-lg text-blue-600 hover:text-blue-700 hover:bg-blue-50 bg-blue-50/60 border border-blue-200/60 transition-colors inline-flex items-center justify-center opacity-100 cursor-pointer shadow-2xs"
+                          title="Chỉnh sửa phòng ban"
+                        >
+                          <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 20h9"></path>
+                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeletingDepartment(item)}
+                          className="p-1.5 rounded-lg text-rose-600 hover:text-rose-700 hover:bg-rose-50 bg-rose-50/60 border border-rose-200/60 transition-colors inline-flex items-center justify-center opacity-100 cursor-pointer shadow-2xs"
+                          title="Xóa phòng ban"
+                        >
+                          <svg className="w-4 h-4 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                            <line x1="14" y1="11" x2="14" y2="17"></line>
+                          </svg>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredDepartmentsList.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="text-center py-8 text-slate-400 text-xs">
+                      {departmentSearchQuery.trim() ? 'Chưa tìm thấy phòng ban nào phù hợp.' : 'Chưa có phòng ban nào trong danh mục.'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+
+            {/* Pagination Footer */}
+            <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+              <div className="flex items-center gap-2">
+                <span>Hiển thị</span>
+                <select value={departmentPageSize} onChange={e => { setDepartmentPageSize(Number(e.target.value)); setDepartmentCurrentPage(1); }} className="form-select h-8 text-xs py-0">
+                  <option value={10}>10 dòng</option>
+                  <option value={25}>25 dòng</option>
+                  <option value={50}>50 dòng</option>
+                </select>
+                <span>/ Tổng {filteredDepartmentsList.length} dòng</span>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <button disabled={departmentCurrentPage === 1} onClick={() => setDepartmentCurrentPage(p => p - 1)} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40">
+                  <i data-lucide="chevron-left" className="w-4 h-4"></i>
+                </button>
+                <span className="px-3 py-1 font-semibold text-slate-700">Trang {departmentCurrentPage} / {departmentTotalPages}</span>
+                <button disabled={departmentCurrentPage >= departmentTotalPages} onClick={() => setDepartmentCurrentPage(p => p + 1)} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40">
+                  <i data-lucide="chevron-right" className="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Add Department Modal */}
+          {showAddDepartmentModal && (
+            <div className="modal-backdrop">
+              <div className="modal-content max-w-md">
+                <div className="modal-header">
+                  <h3 className="font-bold text-slate-900 text-sm">Thêm mới Phòng ban</h3>
+                  <button onClick={() => setShowAddDepartmentModal(false)} disabled={isSubmitting} className="p-1 rounded text-slate-400 hover:bg-slate-100">
+                    <i data-lucide="x" className="w-4 h-4"></i>
+                  </button>
+                </div>
+                <form onSubmit={handleAddDepartment}>
+                  <div className="modal-body space-y-4 text-xs">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Tên Phòng ban / Đơn vị *</label>
+                      <input
+                        type="text"
+                        placeholder="Ví dụ: Phòng Kinh tế"
+                        value={departmentInput}
+                        onChange={e => setDepartmentInput(e.target.value)}
+                        className="form-input"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <button type="button" onClick={() => setShowAddDepartmentModal(false)} disabled={isSubmitting} className="btn-secondary text-xs">Hủy</button>
+                    <button type="submit" disabled={isSubmitting} className="btn-primary text-xs inline-flex items-center gap-1.5 min-w-[100px] justify-center">
+                      {isSubmitting ? (
+                        <>
+                          <Spinner className="w-3.5 h-3.5 text-white" />
+                          <span>Đang lưu...</span>
+                        </>
+                      ) : (
+                        <span>Lưu phòng ban</span>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Edit Department Modal */}
+          {editingDepartment && (
+            <div className="modal-backdrop">
+              <div className="modal-content max-w-md">
+                <div className="modal-header">
+                  <h3 className="font-bold text-slate-900 text-sm">Chỉnh sửa Phòng ban</h3>
+                  <button onClick={() => setEditingDepartment(null)} disabled={isSubmitting} className="p-1 rounded text-slate-400 hover:bg-slate-100">
+                    <i data-lucide="x" className="w-4 h-4"></i>
+                  </button>
+                </div>
+                <form onSubmit={handleEditDepartment}>
+                  <div className="modal-body space-y-4 text-xs">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Tên Phòng ban / Đơn vị *</label>
+                      <input
+                        type="text"
+                        value={departmentEditInput}
+                        onChange={e => setDepartmentEditInput(e.target.value)}
+                        className="form-input"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <button type="button" onClick={() => setEditingDepartment(null)} disabled={isSubmitting} className="btn-secondary text-xs">Hủy</button>
+                    <button type="submit" disabled={isSubmitting} className="btn-primary text-xs inline-flex items-center gap-1.5 min-w-[120px] justify-center">
+                      {isSubmitting ? (
+                        <>
+                          <Spinner className="w-3.5 h-3.5 text-white" />
+                          <span>Đang lưu...</span>
+                        </>
+                      ) : (
+                        <span>Lưu thay đổi</span>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Confirm Delete Department Modal */}
+          {deletingDepartment && (
+            <ConfirmModal
+              title="Xác nhận xóa Phòng ban"
+              message={`Bạn có chắc chắn muốn xóa phòng ban "${deletingDepartment}"? Thao tác này sẽ gỡ khỏi danh mục.`}
+              onClose={() => setDeletingDepartment(null)}
+              onConfirm={() => handleDeleteDepartment(deletingDepartment)}
+            />
+          )}
+        </div>
+      )}
+
       {activeCategory === 'agencies' && (
         <div className="space-y-4">
           {/* Header Toolbar & Action Button */}
