@@ -341,10 +341,11 @@ function App() {
         }
         if (data.categories && typeof data.categories === 'object') {
           setCategories(prev => ({
+            ...prev,
             ...data.categories,
             departments: (data.categories.departments && Array.isArray(data.categories.departments) && data.categories.departments.length > 0)
-              ? Array.from(new Set([...(data.categories.departments), ...(prev.departments || [])]))
-              : (prev.departments || [])
+              ? data.categories.departments.map(d => String(d || '').trim()).filter(Boolean)
+              : (prev.departments || []).map(d => String(d || '').trim()).filter(Boolean)
           }));
         }
         if (data.users && Array.isArray(data.users)) {
@@ -2266,15 +2267,16 @@ function SearchableSelect({
 // 5. DASHBOARD VIEW COMPONENT
 // ----------------------------------------------------------------------
 function DashboardView({ tasks, filters, setFilters, onOpenDetail, categories }) {
-  // Extract dynamic department list (reads directly from Settings!A4:A500 via categories.departments)
+  // Extract dynamic department list (reads directly from Settings!A4:A50 via categories.departments)
   const departmentList = useMemo(() => {
+    let list = [];
     if (categories?.departments && Array.isArray(categories.departments) && categories.departments.length > 0) {
-      return categories.departments;
+      list = categories.departments;
+    } else {
+      list = window.INITIAL_CATEGORIES?.departments || ['Kinh tế', 'VH - XH', 'Văn phòng UBND', 'Trung tâm PVHCC', 'Trung tâm DVTH', 'Hội đồng nhân dân', 'Đô thị'];
     }
-    const deptsFromTasks = Array.from(new Set((tasks || []).map(t => t.phong_ban).filter(Boolean)));
-    if (deptsFromTasks.length > 0) return deptsFromTasks;
-    return window.INITIAL_CATEGORIES?.departments || ['Kinh tế', 'VH - XH'];
-  }, [categories, tasks]);
+    return list.map(d => String(d || '').trim()).filter(Boolean);
+  }, [categories]);
 
   // Chart references
   const monthlyChartRef = useRef(null);
@@ -2813,12 +2815,15 @@ function TasksView({
   const userDept = user?.department || '';
   const isDeptRestricted = !isAdmin && userDept && userDept !== 'ALL';
 
-  // Extract dynamic department list (reads directly from Settings!A4:A6 via categories.departments)
+  // Extract dynamic department list (reads directly from Settings!A4:A50 via categories.departments)
   const departmentList = useMemo(() => {
+    let list = [];
     if (categories?.departments && Array.isArray(categories.departments) && categories.departments.length > 0) {
-      return categories.departments;
+      list = categories.departments;
+    } else {
+      list = window.INITIAL_CATEGORIES?.departments || ['Kinh tế', 'VH - XH', 'Văn phòng UBND', 'Trung tâm PVHCC', 'Trung tâm DVTH', 'Hội đồng nhân dân', 'Đô thị'];
     }
-    return window.INITIAL_CATEGORIES?.departments || ['Phòng Kinh tế', 'Phòng VH - XH', 'Văn phòng UBND'];
+    return list.map(d => String(d || '').trim()).filter(Boolean);
   }, [categories]);
 
   // Draft filter state (user selections before pressing "Tìm kiếm")
@@ -3525,10 +3530,13 @@ function AddTaskModal({ categories, employees, defaultDepartment = '', onClose, 
   }, [categories]);
 
   const departmentList = useMemo(() => {
+    let list = [];
     if (categories?.departments && Array.isArray(categories.departments) && categories.departments.length > 0) {
-      return categories.departments;
+      list = categories.departments;
+    } else {
+      list = window.INITIAL_CATEGORIES?.departments || ['Kinh tế', 'VH - XH', 'Văn phòng UBND', 'Trung tâm PVHCC', 'Trung tâm DVTH', 'Hội đồng nhân dân', 'Đô thị'];
     }
-    return window.INITIAL_CATEGORIES?.departments || ['Phòng Kinh tế', 'Phòng VH - XH', 'Văn phòng UBND'];
+    return list.map(d => String(d || '').trim()).filter(Boolean);
   }, [categories]);
 
   const [formData, setFormData] = useState(() => {
@@ -3762,10 +3770,10 @@ function EditTaskModal({ task, categories, employees, onClose, onSubmit }) {
   }, [categories, task]);
 
   const departmentList = useMemo(() => {
-    const catDepts = (categories?.departments && Array.isArray(categories.departments) && categories.departments.length > 0)
+    let catDepts = (categories?.departments && Array.isArray(categories.departments) && categories.departments.length > 0)
       ? categories.departments
-      : (window.INITIAL_CATEGORIES?.departments || ['Phòng Kinh tế', 'Phòng VH - XH', 'Văn phòng UBND']);
-    const set = new Set([...catDepts]);
+      : (window.INITIAL_CATEGORIES?.departments || ['Kinh tế', 'VH - XH', 'Văn phòng UBND', 'Trung tâm PVHCC', 'Trung tâm DVTH', 'Hội đồng nhân dân', 'Đô thị']);
+    const set = new Set(catDepts.map(d => String(d || '').trim()).filter(Boolean));
     if (task.phong_ban && task.phong_ban.trim() !== '') {
       set.add(task.phong_ban.trim());
     }

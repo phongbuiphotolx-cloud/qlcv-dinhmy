@@ -124,7 +124,7 @@ function loadInitialInMemoryData() {
           { ma_nv: 'NV003', ho_ten: 'Đặng Hoàng Đa', phong_ban: 'Kinh tế', chuc_vu: 'Chuyên viên', trang_thai: 'Đang làm việc', ghi_chu: 'Đang làm việc' }
         ],
         categories: {
-          departments: ['Kinh tế', 'VH - XH', 'Đô thị'],
+          departments: ['Kinh tế', 'VH - XH', 'Văn phòng UBND', 'Trung tâm PVHCC', 'Trung tâm DVTH', 'Hội đồng nhân dân', 'Đô thị'],
           agencies: ['Sở Tài Chính', 'Sở Xây dựng', 'Sở Nông nghiệp và PTNT'],
           empStatuses: ['Đang làm việc', 'Tạm nghỉ', 'Nghỉ việc']
         },
@@ -145,7 +145,7 @@ function loadInitialInMemoryData() {
   inMemoryData = {
     tasks: [],
     employees: [],
-    categories: { departments: ['Kinh tế', 'VH - XH'], agencies: [], empStatuses: ['Đang làm việc', 'Tạm nghỉ', 'Nghỉ việc'] },
+    categories: { departments: ['Kinh tế', 'VH - XH', 'Văn phòng UBND', 'Trung tâm PVHCC', 'Trung tâm DVTH', 'Hội đồng nhân dân', 'Đô thị'], agencies: [], empStatuses: ['Đang làm việc', 'Tạm nghỉ', 'Nghỉ việc'] },
     users: [
       { username: 'admin', password: 'admin', department: 'ALL', role: 'ADMIN', name: 'Quản trị viên Hệ thống' }
     ],
@@ -511,20 +511,24 @@ async function getData(forceRefresh = false) {
       });
     }
 
-    // 3. Parse Settings (Đọc đầy đủ tất cả phòng ban từ Cột A trong dải ô Setting!A4:A50)
+    // 3. Parse Settings (Đọc đầy đủ tất cả phòng ban từ Cột A trong dải ô Settings!A4:A50)
     const departments = [];
     const maxDeptRow = Math.min(setRows.length, 50);
     for (let r = 3; r < maxDeptRow; r++) {
       const val = String(setRows[r]?.[0] || '').trim();
-      if (val && !departments.includes(val)) departments.push(val);
+      if (val && val !== '' && val !== 'null' && val !== 'undefined' && !departments.includes(val)) {
+        departments.push(val);
+      }
     }
 
-    // Merge memory store departments to guarantee no added data is lost
-    const memData = loadInitialInMemoryData();
-    if (memData && memData.categories && Array.isArray(memData.categories.departments)) {
-      memData.categories.departments.forEach(d => {
-        if (d && !departments.includes(d)) departments.push(d);
-      });
+    // Nếu không tìm thấy phòng ban nào từ Sheet Settings!A4:A50 thì mới nạp danh sách mặc định
+    if (departments.length === 0) {
+      const memData = loadInitialInMemoryData();
+      if (memData && memData.categories && Array.isArray(memData.categories.departments)) {
+        memData.categories.departments.forEach(d => {
+          if (d && d.trim() !== '' && !departments.includes(d)) departments.push(d.trim());
+        });
+      }
     }
 
     const agencies = [];
