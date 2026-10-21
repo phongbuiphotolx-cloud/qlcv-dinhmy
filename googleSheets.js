@@ -1,11 +1,24 @@
-if (require('module').globalPaths && require('fs').existsSync('C:/Users/buith/AppData/Local/Temp/qlcv_deps/node_modules')) {
-  require('module').globalPaths.push('C:/Users/buith/AppData/Local/Temp/qlcv_deps/node_modules');
-  module.paths.push('C:/Users/buith/AppData/Local/Temp/qlcv_deps/node_modules');
-}
-
-const { google } = require('googleapis');
+const os = require('os');
 const path = require('path');
 const fs = require('fs');
+
+const depPaths = [
+  path.join(os.tmpdir(), 'qlcv_deps', 'node_modules'),
+  'C:/Users/buith/AppData/Local/Temp/qlcv_deps/node_modules'
+];
+for (const p of depPaths) {
+  if (fs.existsSync(p)) {
+    if (require('module').globalPaths && !require('module').globalPaths.includes(p)) {
+      require('module').globalPaths.push(p);
+    }
+    if (!module.paths.includes(p)) {
+      module.paths.unshift(p);
+    }
+  }
+}
+
+require('dotenv').config();
+const { google } = require('googleapis');
 
 // Cấu hình Service Account cho Google Sheets API
 const SERVICE_ACCOUNT_EMAIL = 'qlcv-417@qlcv-505501.iam.gserviceaccount.com';
@@ -118,6 +131,7 @@ function loadInitialInMemoryData() {
 
       inMemoryData = {
         tasks: tasks.map((t, idx) => ({ ...t, id: idx + 1, excel_row: idx + 4 })),
+        leadershipTasks: [],
         employees: [
           { ma_nv: 'NV001', ho_ten: 'Phạm Duy Thảo', phong_ban: 'Kinh tế', chuc_vu: 'Chuyên viên', trang_thai: 'Đang làm việc', ghi_chu: 'Đang làm việc' },
           { ma_nv: 'NV002', ho_ten: 'Cao Trần Quang', phong_ban: 'Kinh tế', chuc_vu: 'Chuyên viên', trang_thai: 'Đang làm việc', ghi_chu: 'Đang làm việc' },
@@ -126,7 +140,13 @@ function loadInitialInMemoryData() {
         categories: {
           departments: ['Kinh tế', 'VH - XH', 'Văn phòng UBND', 'Trung tâm PVHCC', 'Trung tâm DVTH', 'Hội đồng nhân dân', 'Đô thị'],
           agencies: ['Sở Tài Chính', 'Sở Xây dựng', 'Sở Nông nghiệp và PTNT'],
-          empStatuses: ['Đang làm việc', 'Tạm nghỉ', 'Nghỉ việc']
+          empStatuses: ['Đang làm việc', 'Tạm nghỉ', 'Nghỉ việc'],
+          leaders: [
+            { name: 'BT - Trần Thanh Hải', status: 'Hiện' },
+            { name: 'CT - Lê Hiền Hoà', status: 'Hiện' },
+            { name: 'PCT - Hồ Văn Quí', status: 'Hiện' },
+            { name: 'PCT - Huỳnh Ngọc Danh', status: 'Hiện' }
+          ]
         },
         users: users,
         fileStatus: {
@@ -144,8 +164,19 @@ function loadInitialInMemoryData() {
 
   inMemoryData = {
     tasks: [],
+    leadershipTasks: [],
     employees: [],
-    categories: { departments: ['Kinh tế', 'VH - XH', 'Văn phòng UBND', 'Trung tâm PVHCC', 'Trung tâm DVTH', 'Hội đồng nhân dân', 'Đô thị'], agencies: [], empStatuses: ['Đang làm việc', 'Tạm nghỉ', 'Nghỉ việc'] },
+    categories: {
+      departments: ['Kinh tế', 'VH - XH', 'Văn phòng UBND', 'Trung tâm PVHCC', 'Trung tâm DVTH', 'Hội đồng nhân dân', 'Đô thị'],
+      agencies: [],
+      empStatuses: ['Đang làm việc', 'Tạm nghỉ', 'Nghỉ việc'],
+      leaders: [
+        { name: 'BT - Trần Thanh Hải', status: 'Hiện' },
+        { name: 'CT - Lê Hiền Hoà', status: 'Hiện' },
+        { name: 'PCT - Hồ Văn Quí', status: 'Hiện' },
+        { name: 'PCT - Huỳnh Ngọc Danh', status: 'Hiện' }
+      ]
+    },
     users: [
       { username: 'admin', password: 'admin', department: 'ALL', role: 'ADMIN', name: 'Quản trị viên Hệ thống' }
     ],
@@ -285,9 +316,13 @@ async function getSheetIdByTitle(spreadsheetId, title) {
 
 // Xóa hoàn toàn dòng khỏi Google Sheets (deleteDimension), không để lại dòng trống
 async function deleteSheetRow(spreadsheetId, tabTitle, targetRow) {
-  if (!spreadsheetId || !targetRow || targetRow < 4) return;
+  const minRow = (tabTitle === 'Tasks_LanhDao_TheoDoi') ? 2 : 4;
+  if (!spreadsheetId || !targetRow || targetRow < minRow) {
+    console.warn(`[deleteSheetRow] Bỏ qua vì targetRow (${targetRow}) < minRow (${minRow}) cho tab '${tabTitle}'`);
+    return false;
+  }
   const sheetId = await getSheetIdByTitle(spreadsheetId, tabTitle);
-  if (sheetId !== null) {
+  if (typeof sheetId === 'number') {
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId,
       requestBody: {
@@ -305,12 +340,16 @@ async function deleteSheetRow(spreadsheetId, tabTitle, targetRow) {
         ]
       }
     });
+    console.log(`[Google Sheets API] Đã xóa hoàn toàn dòng ${targetRow} khỏi tab '${tabTitle}' (sheetId: ${sheetId})`);
+    return true;
   } else {
     // Fallback xóa nội dung dải ô nếu không lấy được sheetId
     await sheets.spreadsheets.values.clear({
       spreadsheetId,
-      range: `${tabTitle}!A${targetRow}:L${targetRow}`
+      range: `${tabTitle}!A${targetRow}:Z${targetRow}`
     });
+    console.warn(`[Google Sheets API] Đã clear dữ liệu dòng ${targetRow} trên tab '${tabTitle}'`);
+    return true;
   }
 }
 
@@ -320,7 +359,7 @@ async function ensureSheetTabs(spreadsheetId) {
     const meta = await sheets.spreadsheets.get({ spreadsheetId });
     const existingTitles = (meta.data.sheets || []).map(s => s.properties.title);
 
-    const requiredTabs = ['Tasks', 'Employees', 'Settings'];
+    const requiredTabs = ['Tasks', 'Employees', 'Settings', 'Tasks_LanhDao_TheoDoi'];
     const addRequests = [];
 
     for (const tab of requiredTabs) {
@@ -337,6 +376,21 @@ async function ensureSheetTabs(spreadsheetId) {
         requestBody: { requests: addRequests }
       });
       await initializeDefaultHeadersAndSeed(spreadsheetId);
+
+      if (addRequests.some(r => r.addSheet?.properties?.title === 'Tasks_LanhDao_TheoDoi')) {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId,
+          range: 'Tasks_LanhDao_TheoDoi!A1:P1',
+          valueInputOption: 'USER_ENTERED',
+          requestBody: {
+            values: [[
+              'Mã CV', 'Nơi ban hành', 'Số Công văn', 'Tên công việc', 'Mô tả', 'Phòng ban',
+              'Ngày tạo', 'Deadline', 'Ngày hoàn thành', 'Trạng thái', 'Kết quả (Sản phẩm, Văn bản ban hành)',
+              'Ghi chú', 'Số ngày còn lại', 'Số ngày trễ', 'Đánh giá', 'Đơn vị Phối hợp'
+            ]]
+          }
+        });
+      }
     }
   } catch (err) {
     if (err.message && err.message.includes('permission')) {
@@ -434,16 +488,17 @@ async function getData(forceRefresh = false) {
   try {
     await ensureSheetTabs(spreadsheetId);
 
-    // Dải ô động cho Tasks!A1:T (quét 100% dữ liệu thực tế không giới hạn số dòng)
+    // Dải ô động cho Tasks!A1:T, Settings!A1:Q500 và Tasks_LanhDao_TheoDoi!A1:Q
     const res = await sheets.spreadsheets.values.batchGet({
       spreadsheetId,
-      ranges: ['Tasks!A1:T', 'Employees!A1:E500', 'Settings!A1:O500']
+      ranges: ['Tasks!A1:T', 'Employees!A1:E500', 'Settings!A1:Q500', 'Tasks_LanhDao_TheoDoi!A1:Q']
     });
 
     const valueRanges = res.data.valueRanges || [];
     const tasksRows = valueRanges[0]?.values || [];
     const empRows = valueRanges[1]?.values || [];
     const setRows = valueRanges[2]?.values || [];
+    const leadershipRows = valueRanges[3]?.values || [];
 
     // Nếu Sheet trống, tự động nạp dữ liệu mẫu ban đầu
     if (tasksRows.length <= 3 && empRows.length <= 3) {
@@ -486,6 +541,50 @@ async function getData(forceRefresh = false) {
           ngay_hoan_thanh: row[8]
         }),
         don_vi_phoi_hop: String(row[19] || '')
+      });
+    }
+
+    // 1.1 Parse Tasks_LanhDao_TheoDoi (Hàng dữ liệu bắt đầu từ Row 2 vì Row 1 là Header)
+    const leadershipTasks = [];
+    let ldIdCounter = 1;
+    for (let r = 1; r < leadershipRows.length; r++) {
+      const row = leadershipRows[r] || [];
+      const ma_cv = row[0] || '';
+      const noi_ban_hanh = row[1] || '';
+      const so_cong_van = row[2] || '';
+      const ten_cong_viec = row[3] || '';
+
+      if (!so_cong_van && !ten_cong_viec && !ma_cv) continue;
+
+      const trang_thai = String(row[9] || 'Đang thực hiện');
+      const deadline = String(row[7] || '');
+      const ngay_hoan_thanh = String(row[8] || '');
+      const assignedMaCV = String(ma_cv || `LD${String(ldIdCounter).padStart(3, '0')}`);
+
+      leadershipTasks.push({
+        id: ldIdCounter++,
+        excel_row: r + 1,
+        ma_cv: assignedMaCV,
+        noi_ban_hanh: String(noi_ban_hanh || ''),
+        so_cong_van: String(so_cong_van || ''),
+        ten_cong_viec: String(ten_cong_viec || ''),
+        mo_ta: String(row[4] || ''),
+        phong_ban: String(row[5] || ''),
+        ngay_tao: String(row[6] || ''),
+        deadline: deadline,
+        ngay_hoan_thanh: ngay_hoan_thanh,
+        trang_thai: trang_thai,
+        ket_qua: String(row[10] || ''),
+        ghi_chu: String(row[11] || ''),
+        so_ngay_con_lai: String(row[12] || ''),
+        so_ngay_tre: String(row[13] || ''),
+        danh_gia: String(row[14] || calculateEvaluation({
+          trang_thai,
+          deadline,
+          ngay_hoan_thanh
+        })),
+        don_vi_phoi_hop: String(row[15] || ''),
+        lanh_dao: String(row[16] || '')
       });
     }
 
@@ -560,15 +659,36 @@ async function getData(forceRefresh = false) {
       }
     }
 
+    const leaders = [];
+    for (let r = 3; r < setRows.length; r++) {
+      const leaderName = String(setRows[r]?.[15] || '').trim();
+      const leaderStatus = String(setRows[r]?.[16] || '').trim();
+      if (leaderName) {
+        leaders.push({
+          name: leaderName,
+          status: (leaderStatus === 'Ẩn' || leaderStatus.toLowerCase() === 'ẩn') ? 'Ẩn' : 'Hiện'
+        });
+      }
+    }
+    if (leaders.length === 0) {
+      leaders.push(
+        { name: 'BT - Trần Thanh Hải', status: 'Hiện' },
+        { name: 'CT - Lê Hiền Hoà', status: 'Hiện' },
+        { name: 'PCT - Hồ Văn Quí', status: 'Hiện' },
+        { name: 'PCT - Huỳnh Ngọc Danh', status: 'Hiện' }
+      );
+    }
+
     const parsedResult = {
       tasks,
+      leadershipTasks,
       employees,
-      categories: { departments, agencies, empStatuses },
+      categories: { departments, agencies, empStatuses, leaders },
       users,
       fileStatus: {
         lastModified: new Date().toISOString(),
         ticks: Date.now(),
-        size: tasks.length * 100 + 1000,
+        size: (tasks.length + leadershipTasks.length) * 100 + 1000,
         spreadsheetId
       }
     };
@@ -600,10 +720,23 @@ async function addItem(type, data) {
     } else if (type === 'agencies') {
       const name = String(typeof data === 'object' ? data.name : data).trim();
       if (name) memData.categories.agencies.push(name);
+    } else if (type === 'leaders' || type === 'leadership') {
+      if (!memData.categories.leaders) memData.categories.leaders = [];
+      const leaderObj = typeof data === 'object'
+        ? { name: String(data.name || '').trim(), status: data.status || 'Hiện' }
+        : { name: String(data).trim(), status: 'Hiện' };
+      if (leaderObj.name) memData.categories.leaders.push(leaderObj);
+      return { success: true, name: leaderObj.name, message: 'Added leader (in-memory)' };
     } else if (type === 'employees') {
       memData.employees.push({ ...data, trang_thai: normalizeEmpStatus(data.trang_thai) });
     } else if (type === 'users') {
       memData.users.push(data);
+    } else if (type === 'leadership_tasks' || type === 'leadership-tasks' || type === 'tasks_lanh_dao') {
+      if (!memData.leadershipTasks) memData.leadershipTasks = [];
+      const id = memData.leadershipTasks.length + 1;
+      const ma_cv = data.ma_cv || `LD${String(id).padStart(3, '0')}`;
+      memData.leadershipTasks.push({ ...data, id, ma_cv });
+      return { success: true, id, ma_cv, message: 'Added leadership task (in-memory)' };
     } else {
       memData.tasks.push({ ...data, id: memData.tasks.length + 1 });
     }
@@ -611,6 +744,75 @@ async function addItem(type, data) {
   }
 
   const currentData = await getData();
+
+  if (type === 'leadership_tasks' || type === 'leadership-tasks' || type === 'tasks_lanh_dao') {
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Tasks_LanhDao_TheoDoi!A:A' });
+    const existing = res.data.values || [];
+    const targetRow = Math.max(existing.length + 1, 2);
+    const taskNum = targetRow - 1;
+    const ma_cv = data.ma_cv || `LD${String(taskNum).padStart(3, '0')}`;
+    const statusVal = data.trang_thai || 'Đang thực hiện';
+
+    const deadline = String(data.deadline || '');
+    const ngay_hoan_thanh = String(data.ngay_hoan_thanh || '');
+
+    let calcDaysLeft = '';
+    let calcDaysLate = '';
+    const tDeadline = parseDateToTimestamp(deadline);
+    const tCurrent = getMidnightTimestamp();
+    const tHoanThanh = parseDateToTimestamp(ngay_hoan_thanh);
+
+    if (statusVal.toLowerCase().includes('hoàn thành')) {
+      if (tDeadline && tHoanThanh && tHoanThanh > tDeadline) {
+        calcDaysLate = String(Math.round((tHoanThanh - tDeadline) / 86400000));
+      }
+    } else if (!statusVal.toLowerCase().includes('hủy') && !statusVal.toLowerCase().includes('tạm dừng')) {
+      if (tDeadline) {
+        const diff = Math.round((tDeadline - tCurrent) / 86400000);
+        if (diff >= 0) {
+          calcDaysLeft = String(diff);
+        } else {
+          calcDaysLate = String(Math.abs(diff));
+        }
+      }
+    }
+
+    const calcEval = calculateEvaluation({
+      trang_thai: statusVal,
+      deadline: deadline,
+      ngay_hoan_thanh: ngay_hoan_thanh
+    });
+
+    const newRowValues = [
+      String(ma_cv),
+      String(data.noi_ban_hanh || ''),
+      String(data.so_cong_van || ''),
+      String(data.ten_cong_viec || ''),
+      String(data.mo_ta || ''),
+      String(data.phong_ban || ''),
+      String(data.ngay_tao || ''),
+      deadline,
+      ngay_hoan_thanh,
+      String(statusVal),
+      String(data.ket_qua || ''),
+      String(data.ghi_chu || ''),
+      String(data.so_ngay_con_lai !== undefined && data.so_ngay_con_lai !== '' ? data.so_ngay_con_lai : calcDaysLeft),
+      String(data.so_ngay_tre !== undefined && data.so_ngay_tre !== '' ? data.so_ngay_tre : calcDaysLate),
+      String(data.danh_gia || calcEval),
+      String(data.don_vi_phoi_hop || ''),
+      String(data.lanh_dao || '')
+    ];
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `Tasks_LanhDao_TheoDoi!A${targetRow}:Q${targetRow}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [newRowValues] }
+    });
+
+    clearDataCache();
+    return { success: true, id: taskNum, ma_cv: ma_cv, excel_row: targetRow, message: 'Added leadership task successfully' };
+  }
 
   if (type === 'departments') {
     let deptName = typeof data === 'object' ? (data.name || data.phong_ban || '') : String(data);
@@ -678,6 +880,37 @@ async function addItem(type, data) {
 
     clearDataCache();
     return { success: true, name: agencyName, excel_row: targetRow, message: 'Added agency successfully' };
+  }
+
+  if (type === 'leaders' || type === 'leadership') {
+    let leaderName = typeof data === 'object' ? (data.name || data.ten_lanh_dao || '') : String(data);
+    leaderName = String(leaderName).trim();
+    if (!leaderName) throw new Error('Tên Lãnh đạo không được để rỗng.');
+    let leaderStatus = (typeof data === 'object' && data.status) ? String(data.status).trim() : 'Hiện';
+    if (leaderStatus !== 'Ẩn') leaderStatus = 'Hiện';
+
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Settings!P4:Q200' });
+    const existing = res.data.values || [];
+    let targetRowIndex = -1;
+    for (let i = 0; i < existing.length; i++) {
+      const row = existing[i];
+      const name = String(row?.[0] || '').trim();
+      if (!name) {
+        targetRowIndex = i;
+        break;
+      }
+    }
+    const targetRow = (targetRowIndex !== -1 ? targetRowIndex : existing.length) + 4;
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `Settings!P${targetRow}:Q${targetRow}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [[leaderName, leaderStatus]] }
+    });
+
+    clearDataCache();
+    return { success: true, name: leaderName, status: leaderStatus, excel_row: targetRow, message: 'Added leader successfully' };
   }
 
   if (type === 'employees') {
@@ -785,9 +1018,25 @@ async function updateItem(type, data) {
         const idx = memData.categories.departments.indexOf(oldName);
         if (idx !== -1) memData.categories.departments[idx] = newName;
       }
+    } else if (type === 'leaders' || type === 'leadership') {
+      if (!memData.categories.leaders) memData.categories.leaders = [];
+      const oldName = String(data.oldName || data.name || '').trim();
+      const newName = String(data.newName || data.name || oldName).trim();
+      const newStatus = String(data.status || data.newStatus || 'Hiện').trim();
+      const idx = memData.categories.leaders.findIndex(l => (typeof l === 'object' ? l.name : l) === oldName);
+      if (idx !== -1) {
+        memData.categories.leaders[idx] = { name: newName, status: newStatus };
+      } else {
+        memData.categories.leaders.push({ name: newName, status: newStatus });
+      }
+      return { success: true, message: 'Updated leader (in-memory)' };
     } else if (type === 'employees') {
       const idx = memData.employees.findIndex(e => e.ma_nv === data.ma_nv);
       if (idx !== -1) memData.employees[idx] = { ...memData.employees[idx], ...data };
+    } else if (type === 'leadership_tasks' || type === 'leadership-tasks' || type === 'tasks_lanh_dao') {
+      if (!memData.leadershipTasks) memData.leadershipTasks = [];
+      const idx = memData.leadershipTasks.findIndex(t => t.id === data.id || t.ma_cv === data.ma_cv);
+      if (idx !== -1) memData.leadershipTasks[idx] = { ...memData.leadershipTasks[idx], ...data };
     } else if (type === 'tasks') {
       const idx = memData.tasks.findIndex(t => t.id === data.id);
       if (idx !== -1) memData.tasks[idx] = { ...memData.tasks[idx], ...data };
@@ -862,6 +1111,45 @@ async function updateItem(type, data) {
     return { success: true, oldName, newName, message: 'Updated agency successfully' };
   }
 
+  if (type === 'leaders' || type === 'leadership') {
+    const oldName = String(data.oldName || data.name || data.id || '').trim();
+    const newName = String(data.newName || data.name || oldName).trim();
+    let newStatus = String(data.newStatus || data.status || 'Hiện').trim();
+    if (newStatus !== 'Ẩn') newStatus = 'Hiện';
+
+    if (!newName) throw new Error('Tên Lãnh đạo không được để rỗng.');
+
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Settings!P4:Q200' });
+    const rows = res.data.values || [];
+    let foundRow = -1;
+    for (let i = 0; i < rows.length; i++) {
+      if (String(rows[i][0] || '').trim() === oldName) {
+        foundRow = i + 4;
+        break;
+      }
+    }
+
+    if (foundRow !== -1) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `Settings!P${foundRow}:Q${foundRow}`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: [[newName, newStatus]] }
+      });
+    } else {
+      const targetRow = rows.length + 4;
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `Settings!P${targetRow}:Q${targetRow}`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: [[newName, newStatus]] }
+      });
+    }
+
+    clearDataCache();
+    return { success: true, oldName, newName, status: newStatus, message: 'Updated leader successfully' };
+  }
+
   if (type === 'employees') {
     const targetMaNV = String(data.ma_nv || data.id || '').trim();
     if (!targetMaNV) throw new Error('Thiếu Mã NV để cập nhật.');
@@ -925,6 +1213,119 @@ async function updateItem(type, data) {
     }
     clearDataCache();
     return { success: true, username: data.username, message: 'Updated user successfully' };
+  }
+
+  if (type === 'leadership_tasks' || type === 'leadership-tasks' || type === 'tasks_lanh_dao') {
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Tasks_LanhDao_TheoDoi!A:P' });
+    const rows = res.data.values || [];
+    let targetRow = 0;
+
+    const cleanMaCV = String(data.ma_cv || '').trim();
+    if (cleanMaCV) {
+      for (let i = 1; i < rows.length; i++) {
+        if (String(rows[i][0] || '').trim().toLowerCase() === cleanMaCV.toLowerCase()) {
+          targetRow = i + 1;
+          break;
+        }
+      }
+    }
+
+    const cleanSoCV = String(data.so_cong_van || '').trim();
+    if (!targetRow && cleanSoCV) {
+      for (let i = 1; i < rows.length; i++) {
+        if (String(rows[i][2] || '').trim().toLowerCase() === cleanSoCV.toLowerCase()) {
+          targetRow = i + 1;
+          break;
+        }
+      }
+    }
+
+    if (!targetRow && data.excel_row && parseInt(data.excel_row, 10) >= 2) {
+      targetRow = parseInt(data.excel_row, 10);
+    }
+
+    if (!targetRow && data.id) {
+      const reqId = parseInt(data.id, 10);
+      let currentId = 1;
+      for (let i = 1; i < rows.length; i++) {
+        const soCV = String(rows[i][2] || '').trim();
+        const tenCV = String(rows[i][3] || '').trim();
+        if (!soCV && !tenCV) continue;
+        if (currentId === reqId) {
+          targetRow = i + 1;
+          break;
+        }
+        currentId++;
+      }
+    }
+
+    if (!targetRow && data.id) {
+      targetRow = parseInt(data.id, 10) + 1;
+    }
+
+    if (targetRow >= 2) {
+      const cur = rows[targetRow - 1] || [];
+      const statusVal = data.trang_thai !== undefined ? String(data.trang_thai) : (cur[9] || 'Đang thực hiện');
+      const deadline = data.deadline !== undefined ? String(data.deadline) : (cur[7] || '');
+      const ngay_hoan_thanh = data.ngay_hoan_thanh !== undefined ? String(data.ngay_hoan_thanh) : (cur[8] || '');
+
+      let calcDaysLeft = '';
+      let calcDaysLate = '';
+      const tDeadline = parseDateToTimestamp(deadline);
+      const tCurrent = getMidnightTimestamp();
+      const tHoanThanh = parseDateToTimestamp(ngay_hoan_thanh);
+
+      if (statusVal.toLowerCase().includes('hoàn thành')) {
+        if (tDeadline && tHoanThanh && tHoanThanh > tDeadline) {
+          calcDaysLate = String(Math.round((tHoanThanh - tDeadline) / 86400000));
+        }
+      } else if (!statusVal.toLowerCase().includes('hủy') && !statusVal.toLowerCase().includes('tạm dừng')) {
+        if (tDeadline) {
+          const diff = Math.round((tDeadline - tCurrent) / 86400000);
+          if (diff >= 0) {
+            calcDaysLeft = String(diff);
+          } else {
+            calcDaysLate = String(Math.abs(diff));
+          }
+        }
+      }
+
+      const calcEval = calculateEvaluation({
+        trang_thai: statusVal,
+        deadline: deadline,
+        ngay_hoan_thanh: ngay_hoan_thanh
+      });
+
+      const updatedRow = [
+        data.ma_cv !== undefined ? String(data.ma_cv) : (cur[0] || `LD${String(targetRow - 1).padStart(3, '0')}`), // A: Mã CV
+        data.noi_ban_hanh !== undefined ? String(data.noi_ban_hanh) : (cur[1] || ''),                             // B: Nơi ban hành
+        data.so_cong_van !== undefined ? String(data.so_cong_van) : (cur[2] || ''),                               // C: Số Công văn
+        data.ten_cong_viec !== undefined ? String(data.ten_cong_viec) : (cur[3] || ''),                           // D: Tên công việc
+        data.mo_ta !== undefined ? String(data.mo_ta) : (cur[4] || ''),                                           // E: Mô tả
+        data.phong_ban !== undefined ? String(data.phong_ban) : (cur[5] || ''),                                   // F: Phòng ban
+        data.ngay_tao !== undefined ? String(data.ngay_tao) : (cur[6] || ''),                                     // G: Ngày tạo
+        deadline,                                                                                                 // H: Deadline
+        ngay_hoan_thanh,                                                                                          // I: Ngày hoàn thành
+        statusVal,                                                                                                // J: Trạng thái
+        data.ket_qua !== undefined ? String(data.ket_qua) : (cur[10] || ''),                                      // K: Kết quả
+        data.ghi_chu !== undefined ? String(data.ghi_chu) : (cur[11] || ''),                                      // L: Ghi chú
+        data.so_ngay_con_lai !== undefined ? String(data.so_ngay_con_lai) : (calcDaysLeft || cur[12] || ''),     // M: Số ngày còn lại
+        data.so_ngay_tre !== undefined ? String(data.so_ngay_tre) : (calcDaysLate || cur[13] || ''),             // N: Số ngày trễ
+        data.danh_gia !== undefined ? String(data.danh_gia) : (calcEval || cur[14] || ''),                       // O: Đánh giá
+        data.don_vi_phoi_hop !== undefined ? String(data.don_vi_phoi_hop) : (cur[15] || ''),                     // P: Đơn vị / Người phối hợp
+        data.lanh_dao !== undefined ? String(data.lanh_dao) : (cur[16] || '')                                     // Q: Lãnh đạo giao
+      ];
+
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `Tasks_LanhDao_TheoDoi!A${targetRow}:Q${targetRow}`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: [updatedRow] }
+      });
+    }
+
+    clearDataCache();
+    return { success: true, id: data.id, excel_row: targetRow, message: 'Updated leadership task successfully' };
   }
 
   // Default: Tasks
@@ -1016,8 +1417,17 @@ async function deleteItem(type, id, data) {
     if (type === 'departments') {
       const targetName = String(data?.name || data?.oldName || id || '').trim();
       memData.categories.departments = memData.categories.departments.filter(d => d !== targetName);
+    } else if (type === 'leaders' || type === 'leadership') {
+      const targetName = String(data?.name || data?.oldName || id || '').trim();
+      if (memData.categories.leaders) {
+        memData.categories.leaders = memData.categories.leaders.filter(l => (typeof l === 'object' ? l.name : l) !== targetName);
+      }
+      return { success: true, message: 'Deleted leader (in-memory)' };
     } else if (type === 'employees') {
       memData.employees = memData.employees.filter(e => e.ma_nv !== id);
+    } else if (type === 'leadership_tasks' || type === 'leadership-tasks' || type === 'tasks_lanh_dao') {
+      if (!memData.leadershipTasks) memData.leadershipTasks = [];
+      memData.leadershipTasks = memData.leadershipTasks.filter(t => t.id !== parseInt(id, 10) && t.ma_cv !== id);
     } else if (type === 'tasks') {
       memData.tasks = memData.tasks.filter(t => t.id !== parseInt(id, 10));
     }
@@ -1076,6 +1486,39 @@ async function deleteItem(type, id, data) {
     return { success: true, name: targetName, message: 'Deleted agency successfully' };
   }
 
+  if (type === 'leaders' || type === 'leadership') {
+    const targetName = String(data?.name || data?.oldName || id || '').trim();
+    if (targetName) {
+      const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Settings!P4:Q200' });
+      const rows = res.data.values || [];
+      const remainingRows = [];
+      let found = false;
+      for (let i = 0; i < rows.length; i++) {
+        const rowName = String(rows[i][0] || '').trim();
+        if (rowName === targetName && !found) {
+          found = true;
+          continue;
+        }
+        if (rowName) {
+          remainingRows.push([rowName, String(rows[i][1] || 'Hiện')]);
+        }
+      }
+
+      await sheets.spreadsheets.values.clear({ spreadsheetId, range: `Settings!P4:Q${Math.max(rows.length + 4, 10)}` });
+
+      if (remainingRows.length > 0) {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId,
+          range: `Settings!P4:Q${remainingRows.length + 3}`,
+          valueInputOption: 'USER_ENTERED',
+          requestBody: { values: remainingRows }
+        });
+      }
+    }
+    clearDataCache();
+    return { success: true, name: targetName, message: 'Deleted leader successfully' };
+  }
+
   if (type === 'employees') {
     const targetMaNV = String(data?.ma_nv || id || '').trim();
     if (!targetMaNV) throw new Error('Thiếu Mã NV để xóa.');
@@ -1113,6 +1556,95 @@ async function deleteItem(type, id, data) {
     }
     clearDataCache();
     return { success: true, id, message: 'Deleted user successfully' };
+  }
+
+  if (type === 'leadership_tasks' || type === 'leadership-tasks' || type === 'tasks_lanh_dao') {
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Tasks_LanhDao_TheoDoi!A:P' });
+    const rows = res.data.values || [];
+    let targetRow = 0;
+
+    // 1. Ưu tiên tìm kiếm chính xác tuyệt đối theo Mã Công Việc (Cột A)
+    const cleanMaCV = String(data?.ma_cv || (typeof id === 'string' && isNaN(Number(id)) ? id : '') || '').trim();
+    if (cleanMaCV) {
+      for (let i = 1; i < rows.length; i++) {
+        if (String(rows[i][0] || '').trim().toLowerCase() === cleanMaCV.toLowerCase()) {
+          targetRow = i + 1;
+          break;
+        }
+      }
+    }
+
+    // 2. Tìm kiếm dự phòng theo Số công văn và Tên công việc
+    const cleanSoCV = String(data?.so_cong_van || '').trim();
+    const cleanTenCV = String(data?.ten_cong_viec || '').trim();
+
+    if (!targetRow && cleanSoCV && cleanTenCV) {
+      for (let i = 1; i < rows.length; i++) {
+        if (String(rows[i][2] || '').trim().toLowerCase() === cleanSoCV.toLowerCase() &&
+            String(rows[i][3] || '').trim().toLowerCase() === cleanTenCV.toLowerCase()) {
+          targetRow = i + 1;
+          break;
+        }
+      }
+    }
+
+    if (!targetRow && cleanSoCV) {
+      for (let i = 1; i < rows.length; i++) {
+        if (String(rows[i][2] || '').trim().toLowerCase() === cleanSoCV.toLowerCase()) {
+          targetRow = i + 1;
+          break;
+        }
+      }
+    }
+
+    if (!targetRow && cleanTenCV) {
+      for (let i = 1; i < rows.length; i++) {
+        if (String(rows[i][3] || '').trim().toLowerCase() === cleanTenCV.toLowerCase()) {
+          targetRow = i + 1;
+          break;
+        }
+      }
+    }
+
+    // 3. Tìm kiếm theo ID số thứ tự công việc
+    if (!targetRow && id && !isNaN(parseInt(id, 10))) {
+      const targetId = parseInt(id, 10);
+      let currentId = 1;
+      for (let i = 1; i < rows.length; i++) {
+        const maCV = String(rows[i][0] || '').trim();
+        const soCV = String(rows[i][2] || '').trim();
+        const tenCV = String(rows[i][3] || '').trim();
+        if (!maCV && !soCV && !tenCV) continue;
+        if (currentId === targetId) {
+          targetRow = i + 1;
+          break;
+        }
+        currentId++;
+      }
+    }
+
+    // 4. Kiểm tra dòng excel_row nếu hợp lệ
+    if (!targetRow && data?.excel_row && parseInt(data.excel_row, 10) >= 2) {
+      const candidateRow = parseInt(data.excel_row, 10);
+      if (candidateRow <= rows.length) {
+        targetRow = candidateRow;
+      }
+    }
+
+    if (!targetRow || targetRow < 2) {
+      console.error(`[deleteItem leadership_tasks] Không tìm thấy dòng công việc cần xóa trên Google Sheets:`, { id, cleanMaCV, cleanSoCV });
+      return { success: false, error: `Không tìm thấy dòng công việc ${cleanMaCV || cleanSoCV || id} cần xóa trên Google Sheets!` };
+    }
+
+    await deleteSheetRow(spreadsheetId, 'Tasks_LanhDao_TheoDoi', targetRow);
+    clearDataCache();
+    return {
+      success: true,
+      id,
+      ma_cv: cleanMaCV,
+      deletedRow: targetRow,
+      message: 'Đã xóa công việc Lãnh đạo giao thành công khỏi Google Sheets'
+    };
   }
 
   // Default: Tasks
@@ -1221,5 +1753,6 @@ module.exports = {
   calculateEvaluation,
   parseDateToTimestamp,
   getMidnightTimestamp,
-  SERVICE_ACCOUNT_EMAIL
+  SERVICE_ACCOUNT_EMAIL,
+  sheets
 };

@@ -1,13 +1,25 @@
-if (require('module').globalPaths && require('fs').existsSync('C:/Users/buith/AppData/Local/Temp/qlcv_deps/node_modules')) {
-  require('module').globalPaths.push('C:/Users/buith/AppData/Local/Temp/qlcv_deps/node_modules');
-  module.paths.push('C:/Users/buith/AppData/Local/Temp/qlcv_deps/node_modules');
+const os = require('os');
+const path = require('path');
+const fs = require('fs');
+
+const depPaths = [
+  path.join(os.tmpdir(), 'qlcv_deps', 'node_modules'),
+  'C:/Users/buith/AppData/Local/Temp/qlcv_deps/node_modules'
+];
+for (const p of depPaths) {
+  if (fs.existsSync(p)) {
+    if (require('module').globalPaths && !require('module').globalPaths.includes(p)) {
+      require('module').globalPaths.push(p);
+    }
+    if (!module.paths.includes(p)) {
+      module.paths.unshift(p);
+    }
+  }
 }
 
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
-const fs = require('fs');
 const googleSheets = require('./googleSheets');
 const geminiService = require('./geminiService');
 
@@ -86,6 +98,7 @@ app.get('/api/data', async (req, res) => {
 
     res.json({
       tasks: paginatedTasks,
+      leadershipTasks: rawData.leadershipTasks || [],
       totalTasks,
       page,
       limit,
@@ -141,6 +154,47 @@ app.get('/api/tasks', async (req, res) => {
   }
 });
 
+// 2.2 GET /api/leadership-tasks (Danh sách công việc Lãnh đạo giao phòng ban)
+app.get('/api/leadership-tasks', async (req, res) => {
+  try {
+    const rawData = await googleSheets.getData();
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 50;
+
+    let tasks = [...(rawData.leadershipTasks || [])];
+    const { department, status, search } = req.query;
+
+    if (department) tasks = tasks.filter(t => t.phong_ban === department);
+    if (status) tasks = tasks.filter(t => t.trang_thai === status);
+    if (search) {
+      const q = String(search).toLowerCase().trim();
+      tasks = tasks.filter(t =>
+        (t.ten_cong_viec || '').toLowerCase().includes(q) ||
+        (t.so_cong_van || '').toLowerCase().includes(q) ||
+        (t.ma_cv || '').toLowerCase().includes(q) ||
+        (t.mo_ta || '').toLowerCase().includes(q)
+      );
+    }
+
+    const totalTasks = tasks.length;
+    const totalPages = Math.ceil(totalTasks / limit) || 1;
+    const startIndex = (page - 1) * limit;
+    const paginatedTasks = tasks.slice(startIndex, startIndex + limit);
+
+    res.json({
+      success: true,
+      data: paginatedTasks,
+      totalTasks,
+      page,
+      limit,
+      totalPages
+    });
+  } catch (err) {
+    console.error('Lỗi [GET /api/leadership-tasks]:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // 3. POST /api/add
 app.post('/api/add', async (req, res) => {
   try {
@@ -173,9 +227,14 @@ app.post('/api/delete', async (req, res) => {
     const { type = 'tasks', id, data, userRole, userDepartment } = req.body || {};
     const targetId = id || data?.id;
 
-    if (type === 'tasks') {
+    if (type === 'tasks' || type === 'leadership_tasks' || type === 'leadership-tasks' || type === 'tasks_lanh_dao') {
       const currentData = await googleSheets.getData();
-      const targetTask = (currentData.tasks || []).find(t => String(t.id) === String(targetId)) || data;
+      const list = (type === 'tasks') ? (currentData.tasks || []) : (currentData.leadershipTasks || []);
+      const targetTask = list.find(t =>
+        String(t.id) === String(targetId) ||
+        String(t.ma_cv) === String(targetId) ||
+        (data?.ma_cv && String(t.ma_cv).toLowerCase() === String(data.ma_cv).toLowerCase())
+      ) || data;
       const isUserAdmin = userRole === 'ADMIN' || userRole === 'ALL' || userDepartment === 'ALL';
 
       if (targetTask && targetTask.trang_thai === 'Hoàn thành' && !isUserAdmin) {
@@ -188,6 +247,9 @@ app.post('/api/delete', async (req, res) => {
 
     const result = await googleSheets.deleteItem(type, targetId, data);
     googleSheets.clearDataCache();
+    if (result && result.success === false) {
+      return res.status(400).json(result);
+    }
     res.json(result);
   } catch (err) {
     console.error('Lỗi [POST /api/delete]:', err.message);
@@ -237,53 +299,103 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/export-excel', async (req, res) => {
   try {
     const XLSX = require('xlsx');
-    const { tasks = [] } = req.body || {};
+    const { tasks = [], type = 'tasks' } = req.body || {};
 
-    const excelRows = tasks.map((task, index) => ({
-      'STT': index + 1,
-      'Số công văn': task.so_cong_van || '',
-      'Nơi ban hành': task.noi_ban_hanh || '',
-      'Tên công việc': task.ten_cong_viec || '',
-      'Mô tả': task.mo_ta || '',
-      'Phòng ban': task.phong_ban || '',
-      'Người phụ trách': task.nguoi_phu_trach || '',
-      'Đơn vị / Người phối hợp': task.don_vi_phoi_hop || '',
-      'Ngày tạo': task.ngay_tao || '',
-      'Deadline': task.deadline || '',
-      'Ngày hoàn thành': task.ngay_hoan_thanh || '',
-      'Trạng thái': task.trang_thai || '',
-      'Kết quả': task.ket_qua || '',
-      'Ghi chú': task.ghi_chu || '',
-      'Đánh giá': googleSheets.calculateEvaluation ? googleSheets.calculateEvaluation(task) : (task.danh_gia || '')
-    }));
+    const isLeadership = type === 'leadership_tasks' || type === 'leadership-tasks' || type === 'tasks_lanh_dao';
+
+    let excelRows;
+    let colWidths;
+    let sheetName = isLeadership ? 'LanhDao_GiaoViec' : 'CongViec';
+    let defaultFilename = isLeadership ? 'Cong_viec_Lanh_dao_giao.xlsx' : 'Danh_sach_cong_viec.xlsx';
+
+    if (isLeadership) {
+      excelRows = tasks.map((task, index) => ({
+        'STT': index + 1,
+        'Mã CV': task.ma_cv || `LD${String(index + 1).padStart(3, '0')}`,
+        'Nơi ban hành': task.noi_ban_hanh || '',
+        'Số công văn': task.so_cong_van || '',
+        'Tên công việc': task.ten_cong_viec || '',
+        'Mô tả': task.mo_ta || '',
+        'Phòng ban chủ trì': task.phong_ban || '',
+        'Đơn vị / Người phối hợp': task.don_vi_phoi_hop || '',
+        'Ngày tạo': task.ngay_tao || '',
+        'Deadline': task.deadline || '',
+        'Ngày hoàn thành': task.ngay_hoan_thanh || '',
+        'Trạng thái': task.trang_thai || '',
+        'Kết quả': task.ket_qua || '',
+        'Ghi chú': task.ghi_chu || '',
+        'Số ngày còn lại': task.so_ngay_con_lai || '',
+        'Số ngày trễ': task.so_ngay_tre || '',
+        'Đánh giá': googleSheets.calculateEvaluation ? googleSheets.calculateEvaluation(task) : (task.danh_gia || '')
+      }));
+
+      colWidths = [
+        { wch: 6 },  // STT
+        { wch: 12 }, // Mã CV
+        { wch: 22 }, // Nơi ban hành
+        { wch: 22 }, // Số công văn
+        { wch: 45 }, // Tên công việc
+        { wch: 35 }, // Mô tả
+        { wch: 20 }, // Phòng ban chủ trì
+        { wch: 25 }, // Đơn vị / Người phối hợp
+        { wch: 14 }, // Ngày tạo
+        { wch: 14 }, // Deadline
+        { wch: 16 }, // Ngày hoàn thành
+        { wch: 16 }, // Trạng thái
+        { wch: 25 }, // Kết quả
+        { wch: 25 }, // Ghi chú
+        { wch: 16 }, // Số ngày còn lại
+        { wch: 14 }, // Số ngày trễ
+        { wch: 16 }  // Đánh giá
+      ];
+    } else {
+      excelRows = tasks.map((task, index) => ({
+        'STT': index + 1,
+        'Số công văn': task.so_cong_van || '',
+        'Nơi ban hành': task.noi_ban_hanh || '',
+        'Tên công việc': task.ten_cong_viec || '',
+        'Mô tả': task.mo_ta || '',
+        'Phòng ban': task.phong_ban || '',
+        'Người phụ trách': task.nguoi_phu_trach || '',
+        'Đơn vị / Người phối hợp': task.don_vi_phoi_hop || '',
+        'Ngày tạo': task.ngay_tao || '',
+        'Deadline': task.deadline || '',
+        'Ngày hoàn thành': task.ngay_hoan_thanh || '',
+        'Trạng thái': task.trang_thai || '',
+        'Kết quả': task.ket_qua || '',
+        'Ghi chú': task.ghi_chu || '',
+        'Đánh giá': googleSheets.calculateEvaluation ? googleSheets.calculateEvaluation(task) : (task.danh_gia || '')
+      }));
+
+      colWidths = [
+        { wch: 6 },  // STT
+        { wch: 22 }, // Số công văn
+        { wch: 22 }, // Nơi ban hành
+        { wch: 45 }, // Tên công việc
+        { wch: 35 }, // Mô tả
+        { wch: 18 }, // Phòng ban
+        { wch: 22 }, // Người phụ trách
+        { wch: 25 }, // Đơn vị / Người phối hợp
+        { wch: 14 }, // Ngày tạo
+        { wch: 14 }, // Deadline
+        { wch: 16 }, // Ngày hoàn thành
+        { wch: 16 }, // Trạng thái
+        { wch: 25 }, // Kết quả
+        { wch: 25 }, // Ghi chú
+        { wch: 16 }  // Đánh giá
+      ];
+    }
 
     const worksheet = XLSX.utils.json_to_sheet(excelRows);
-
-    worksheet['!cols'] = [
-      { wch: 6 },  // STT
-      { wch: 22 }, // Số công văn
-      { wch: 22 }, // Nơi ban hành
-      { wch: 45 }, // Tên công việc
-      { wch: 35 }, // Mô tả
-      { wch: 18 }, // Phòng ban
-      { wch: 22 }, // Người phụ trách
-      { wch: 25 }, // Đơn vị / Người phối hợp
-      { wch: 14 }, // Ngày tạo
-      { wch: 14 }, // Deadline
-      { wch: 16 }, // Ngày hoàn thành
-      { wch: 16 }, // Trạng thái
-      { wch: 25 }, // Kết quả
-      { wch: 25 }, // Ghi chú
-      { wch: 16 }  // Đánh giá
-    ];
+    worksheet['!cols'] = colWidths;
 
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'CongViec');
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
 
     const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename="Danh_sach_cong_viec.xlsx"');
+    res.setHeader('Content-Disposition', `attachment; filename="${defaultFilename}"`);
     res.send(buffer);
   } catch (err) {
     console.error('Lỗi [POST /api/export-excel]:', err.message);
