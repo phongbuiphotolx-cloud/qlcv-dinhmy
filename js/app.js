@@ -47,6 +47,7 @@ function getDynamicAccounts() {
   }
   return window.INITIAL_USERS || [
     { username: 'admin', password: 'admin', department: 'ALL', role: 'ADMIN', name: 'Quản trị viên Hệ thống' },
+    { username: 'ubnd.lanhdao', password: 'DinhMy@2026', department: 'ALL', role: 'ALL', name: 'Lãnh đạo giao việc' },
     { username: 'ubnd.vt.pkt', password: 'ubnd.vt.pkt', department: 'Kinh tế', role: 'EDIT', name: 'Văn thư Phòng Kinh tế' },
     { username: 'ubnd.pkt', password: 'ubnd.pkt', department: 'Kinh tế', role: 'VIEW', name: 'Chuyên viên Phòng Kinh tế' },
     { username: 'ubnd.vt.pvh', password: 'ubnd.vt.pvh', department: 'VH - XH', role: 'EDIT', name: 'Văn thư Phòng VH - XH' }
@@ -547,30 +548,33 @@ function App() {
     return () => clearInterval(interval);
   }, [user]);
 
-  // Derived RBAC permissions
-  const isAdmin = user?.role === 'ADMIN' || user?.department === 'ALL';
-  const isEdit = user?.role === 'EDIT' || isAdmin;
-  const isViewOnly = user?.role === 'VIEW' && !isAdmin;
-  const userDept = user?.department || 'Kinh tế';
+  // Derived RBAC permissions:
+  // - ADMIN: Quản trị hệ thống cao nhất (thấy tất cả menu, danh mục, cài đặt hệ thống)
+  // - ALL: Xem tổng hợp & chọn tất cả các phòng ban trong nghiệp vụ (không xem menu quản trị)
+  const isAdmin = user?.role === 'ADMIN';
+  const hasAllDeptAccess = user?.role === 'ADMIN' || user?.role === 'ALL' || user?.department === 'ALL';
+  const isEdit = user?.role === 'EDIT' || user?.role === 'ALL' || isAdmin;
+  const isViewOnly = user?.role === 'VIEW' && !isAdmin && user?.role !== 'ALL';
+  const userDept = user?.department || (hasAllDeptAccess ? 'ALL' : 'Kinh tế');
 
-  // Protect menu tabs for non-admin users
+  // Protect menu tabs for non-admin users (only ADMIN can access categories and settings)
   useEffect(() => {
-    if (user && !isAdmin && (activeTab === 'categories' || activeTab === 'settings')) {
+    if (user && !isAdmin && (activeTab === 'categories' || activeTab.startsWith('category-') || activeTab === 'settings')) {
       setActiveTab('dashboard');
     }
   }, [user, isAdmin, activeTab]);
 
   // Department task filtering according to role
   const visibleTasks = useMemo(() => {
-    if (isAdmin) return tasks;
+    if (hasAllDeptAccess) return tasks;
     return tasks.filter(t => t.phong_ban === userDept);
-  }, [tasks, isAdmin, userDept]);
+  }, [tasks, hasAllDeptAccess, userDept]);
 
   // Department leadership task filtering according to role
   const visibleLeadershipTasks = useMemo(() => {
-    if (isAdmin) return leadershipTasks;
+    if (hasAllDeptAccess) return leadershipTasks;
     return leadershipTasks.filter(t => t.phong_ban === userDept);
-  }, [leadershipTasks, isAdmin, userDept]);
+  }, [leadershipTasks, hasAllDeptAccess, userDept]);
 
   // Recalculate KPIs dynamically for visible tasks
   const kpiData = useMemo(() => {
@@ -1445,7 +1449,7 @@ function App() {
 // 2. DESKTOP SIDEBAR COMPONENT
 // ----------------------------------------------------------------------
 function Sidebar({ activeTab, setActiveTab, user, onLogout, isCollapsed = false, onToggleCollapse }) {
-  const isAdmin = user?.role === 'ADMIN' || user?.department === 'ALL';
+  const isAdmin = user?.role === 'ADMIN';
 
   const [isCatOpen, setIsCatOpen] = useState(() => activeTab.startsWith('category') || activeTab === 'categories');
 
@@ -1774,11 +1778,13 @@ function Topbar({ user, activeTab, setActiveTab, onOpenMobileDrawer, onLogout, d
     }
   };
 
-  const roleColor = user?.role === 'ADMIN' || user?.department === 'ALL'
+  const roleColor = user?.role === 'ADMIN'
     ? 'bg-purple-100 text-purple-700 border-purple-200'
-    : user?.role === 'EDIT'
-      ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
-      : 'bg-amber-100 text-amber-700 border-amber-200';
+    : (user?.role === 'ALL' || user?.department === 'ALL')
+      ? 'bg-blue-100 text-blue-700 border-blue-200'
+      : user?.role === 'EDIT'
+        ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+        : 'bg-amber-100 text-amber-700 border-amber-200';
 
   return (
     <header className="h-16 bg-white border-b border-slate-200 px-4 md:px-6 flex items-center justify-between shrink-0 z-20">
@@ -2020,7 +2026,7 @@ function Topbar({ user, activeTab, setActiveTab, onOpenMobileDrawer, onLogout, d
 function MobileDrawer({ isOpen, onClose, activeTab, setActiveTab, user, onLogout }) {
   if (!isOpen) return null;
 
-  const isAdmin = user?.role === 'ADMIN' || user?.department === 'ALL';
+  const isAdmin = user?.role === 'ADMIN';
   const [isCatOpen, setIsCatOpen] = useState(() => activeTab.startsWith('category') || activeTab === 'categories');
 
   useEffect(() => {
@@ -3215,9 +3221,10 @@ function TasksView({
   categories,
   isViewOnly
 }) {
-  const isAdmin = user?.role === 'ADMIN' || user?.department === 'ALL';
+  const isAdmin = user?.role === 'ADMIN';
+  const hasAllDeptAccess = user?.role === 'ADMIN' || user?.role === 'ALL' || user?.department === 'ALL';
   const userDept = user?.department || '';
-  const isDeptRestricted = !isAdmin && userDept && userDept !== 'ALL';
+  const isDeptRestricted = !hasAllDeptAccess && userDept && userDept !== 'ALL';
 
   // Extract dynamic department list (reads directly from Settings!A4:A50 via categories.departments)
   const departmentList = useMemo(() => {
@@ -3989,7 +3996,7 @@ function AddTaskModal({ categories, employees, defaultDepartment = '', onClose, 
     <div className="modal-backdrop">
       <div className="modal-content max-w-2xl max-h-[90vh] flex flex-col">
         <div className="modal-header">
-          <h3 className="font-bold text-slate-900 text-base">Thêm mới Công việc Phòng Kinh tế</h3>
+          <h3 className="font-bold text-slate-900 text-base">Thêm mới Công việc</h3>
           <button onClick={onClose} disabled={isSubmitting} className="p-1 rounded-lg text-slate-400 hover:bg-slate-100">
             <i data-lucide="x" className="w-5 h-5"></i>
           </button>
@@ -5083,9 +5090,10 @@ function LeadershipTasksView({
   isViewOnly,
   addToast
 }) {
-  const isAdmin = user?.role === 'ADMIN' || user?.department === 'ALL';
+  const isAdmin = user?.role === 'ADMIN';
+  const hasAllDeptAccess = user?.role === 'ADMIN' || user?.role === 'ALL' || user?.department === 'ALL';
   const userDept = user?.department || '';
-  const isDeptRestricted = !isAdmin && userDept && userDept !== 'ALL';
+  const isDeptRestricted = !hasAllDeptAccess && userDept && userDept !== 'ALL';
 
   const departmentList = useMemo(() => {
     let list = [];
@@ -7118,9 +7126,10 @@ function EmployeesView({ employees, setEmployees, categories, onRefresh, addToas
 // 11. KPI VIEW COMPONENT
 // ----------------------------------------------------------------------
 function KPIView({ tasks = [], employees = [], categories = {}, user, addToast }) {
-  const isAdmin = user?.role === 'ADMIN' || user?.department === 'ALL';
+  const isAdmin = user?.role === 'ADMIN';
+  const hasAllDeptAccess = user?.role === 'ADMIN' || user?.role === 'ALL' || user?.department === 'ALL';
   const userDept = user?.department || '';
-  const isDeptRestricted = !isAdmin && userDept && userDept !== 'ALL';
+  const isDeptRestricted = !hasAllDeptAccess && userDept && userDept !== 'ALL';
 
   const [selectedDept, setSelectedDept] = useState(() => isDeptRestricted ? userDept : '');
   const [selectedEmpName, setSelectedEmpName] = useState('');
@@ -8440,8 +8449,9 @@ function DocNamingView({ user, addToast }) {
 // 12. REPORTS VIEW COMPONENT
 // ----------------------------------------------------------------------
 function ReportsView({ tasks = [], employees = [], categories, user, addToast }) {
-  const isDeptRestricted = user?.role !== 'ADMIN' && user?.department && user.department !== 'ALL';
+  const hasAllDeptAccess = user?.role === 'ADMIN' || user?.role === 'ALL' || user?.department === 'ALL';
   const userDept = user?.department || '';
+  const isDeptRestricted = !hasAllDeptAccess && userDept && userDept !== 'ALL';
 
   // Initial Filter States
   const [selectedDept, setSelectedDept] = useState(() => isDeptRestricted ? userDept : '');
@@ -9120,9 +9130,10 @@ function BatteryProgressBar({ rate = 0, overdueCount = 0, size = "md" }) {
 // 12.1. LEADERSHIP REPORTS VIEW COMPONENT (BÁO CÁO LÃNH ĐẠO GIAO VIỆC)
 // ----------------------------------------------------------------------
 function LeadershipReportsView({ tasks = [], categories, user, addToast }) {
-  const isAdmin = user?.role === 'ADMIN' || user?.department === 'ALL';
+  const isAdmin = user?.role === 'ADMIN';
+  const hasAllDeptAccess = user?.role === 'ADMIN' || user?.role === 'ALL' || user?.department === 'ALL';
   const userDept = user?.department || '';
-  const isDeptRestricted = !isAdmin && userDept && userDept !== 'ALL';
+  const isDeptRestricted = !hasAllDeptAccess && userDept && userDept !== 'ALL';
 
   // Initial Filter States
   const [selectedDept, setSelectedDept] = useState(() => isDeptRestricted ? userDept : '');
@@ -11482,6 +11493,7 @@ function SettingsView({ user, setUser, accounts, setAccounts, categories, onRefr
                   </td>
                   <td>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${acc.role === 'ADMIN' ? 'bg-purple-100 text-purple-700 border-purple-200' :
+                        acc.role === 'ALL' ? 'bg-blue-100 text-blue-700 border-blue-200' :
                         acc.role === 'EDIT' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
                           'bg-amber-100 text-amber-700 border-amber-200'
                       }`}>
@@ -11585,9 +11597,10 @@ function SettingsView({ user, setUser, accounts, setAccounts, categories, onRefr
                     onChange={e => setFormData({ ...formData, role: e.target.value })}
                     className="form-select text-xs"
                   >
-                    <option value="ADMIN">ADMIN (Toàn quyền)</option>
-                    <option value="EDIT">EDIT (Thêm/Sửa/Xóa)</option>
-                    <option value="VIEW">VIEW (Chỉ xem)</option>
+                    <option value="ADMIN">ADMIN (Quản trị hệ thống cao nhất)</option>
+                    <option value="ALL">ALL (Xem tổng hợp & chọn tất cả phòng ban)</option>
+                    <option value="EDIT">EDIT (Thêm/Sửa/Xóa theo phòng ban)</option>
+                    <option value="VIEW">VIEW (Chỉ xem theo phòng ban)</option>
                   </select>
                 </div>
               </div>
@@ -11657,8 +11670,9 @@ function SettingsView({ user, setUser, accounts, setAccounts, categories, onRefr
                     onChange={e => setEditingAccount({ ...editingAccount, role: e.target.value })}
                     className="form-select text-xs"
                   >
-                    <option value="ADMIN">ADMIN (Toàn quyền)</option>
-                    <option value="EDIT">EDIT (Thêm/Sửa/Xóa)</option>
+                    <option value="ADMIN">ADMIN (Quản trị hệ thống cao nhất)</option>
+                    <option value="ALL">ALL (Xem tổng hợp & chọn tất cả phòng ban)</option>
+                    <option value="EDIT">EDIT (Thêm/Sửa/Xóa theo phòng ban)</option>
                     <option value="VIEW">VIEW (Chỉ xem)</option>
                   </select>
                 </div>

@@ -1,6 +1,7 @@
 // Initial Data Extracted from QLCV_UBND.xlsx
 window.INITIAL_USERS = [
   { username: 'admin', password: 'admin', department: 'ALL', role: 'ADMIN', name: 'Quản trị viên Hệ thống' },
+  { username: 'ubnd.lanhdao', password: 'DinhMy@2026', department: 'ALL', role: 'ALL', name: 'Lãnh đạo giao việc' },
   { username: 'ubnd.vt.pkt', password: 'ubnd.vt.pkt', department: 'Kinh tế', role: 'EDIT', name: 'Văn thư Phòng Kinh tế' },
   { username: 'ubnd.pkt', password: 'ubnd.pkt', department: 'Kinh tế', role: 'VIEW', name: 'Chuyên viên Phòng Kinh tế' },
   { username: 'ubnd.vt.pvh', password: 'ubnd.vt.pvh', department: 'VH - XH', role: 'EDIT', name: 'Văn thư Phòng VH - XH' }

@@ -235,12 +235,12 @@ app.post('/api/delete', async (req, res) => {
         String(t.ma_cv) === String(targetId) ||
         (data?.ma_cv && String(t.ma_cv).toLowerCase() === String(data.ma_cv).toLowerCase())
       ) || data;
-      const isUserAdmin = userRole === 'ADMIN' || userRole === 'ALL' || userDepartment === 'ALL';
+      const isUserAdmin = userRole === 'ADMIN';
 
       if (targetTask && targetTask.trang_thai === 'Hoàn thành' && !isUserAdmin) {
         return res.status(403).json({
           success: false,
-          error: 'Từ chối truy cập: Chỉ tài khoản Quản trị tối cao (Admin / quyền ALL) mới có quyền xóa công việc đã hoàn thành!'
+          error: 'Từ chối truy cập: Chỉ tài khoản Quản trị tối cao (ADMIN) mới có quyền xóa công việc đã hoàn thành!'
         });
       }
     }
