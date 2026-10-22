@@ -380,13 +380,13 @@ async function ensureSheetTabs(spreadsheetId) {
       if (addRequests.some(r => r.addSheet?.properties?.title === 'Tasks_LanhDao_TheoDoi')) {
         await sheets.spreadsheets.values.update({
           spreadsheetId,
-          range: 'Tasks_LanhDao_TheoDoi!A1:P1',
+          range: 'Tasks_LanhDao_TheoDoi!A1:Q1',
           valueInputOption: 'USER_ENTERED',
           requestBody: {
             values: [[
               'Mã CV', 'Nơi ban hành', 'Số Công văn', 'Tên công việc', 'Mô tả', 'Phòng ban',
               'Ngày tạo', 'Deadline', 'Ngày hoàn thành', 'Trạng thái', 'Kết quả (Sản phẩm, Văn bản ban hành)',
-              'Ghi chú', 'Số ngày còn lại', 'Số ngày trễ', 'Đánh giá', 'Đơn vị Phối hợp'
+              'Ghi chú', 'Số ngày còn lại', 'Số ngày trễ', 'Đánh giá', 'Đơn vị Phối hợp', 'Lãnh đạo giao việc'
             ]]
           }
         });
@@ -735,7 +735,8 @@ async function addItem(type, data) {
       if (!memData.leadershipTasks) memData.leadershipTasks = [];
       const id = memData.leadershipTasks.length + 1;
       const ma_cv = data.ma_cv || `LD${String(id).padStart(3, '0')}`;
-      memData.leadershipTasks.push({ ...data, id, ma_cv });
+      const leaderVal = data.lanh_dao || data.lanhDao || data.ten_lanh_dao || data.selectedLeader || data.leader || '';
+      memData.leadershipTasks.push({ ...data, id, ma_cv, lanh_dao: leaderVal });
       return { success: true, id, ma_cv, message: 'Added leadership task (in-memory)' };
     } else {
       memData.tasks.push({ ...data, id: memData.tasks.length + 1 });
@@ -783,6 +784,8 @@ async function addItem(type, data) {
       ngay_hoan_thanh: ngay_hoan_thanh
     });
 
+    const leaderVal = String(data.lanh_dao || data.lanhDao || data.ten_lanh_dao || data.selectedLeader || data.leader || '');
+
     const newRowValues = [
       String(ma_cv),
       String(data.noi_ban_hanh || ''),
@@ -800,7 +803,7 @@ async function addItem(type, data) {
       String(data.so_ngay_tre !== undefined && data.so_ngay_tre !== '' ? data.so_ngay_tre : calcDaysLate),
       String(data.danh_gia || calcEval),
       String(data.don_vi_phoi_hop || ''),
-      String(data.lanh_dao || '')
+      leaderVal
     ];
 
     await sheets.spreadsheets.values.update({
@@ -1216,7 +1219,7 @@ async function updateItem(type, data) {
   }
 
   if (type === 'leadership_tasks' || type === 'leadership-tasks' || type === 'tasks_lanh_dao') {
-    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Tasks_LanhDao_TheoDoi!A:P' });
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Tasks_LanhDao_TheoDoi!A:Q' });
     const rows = res.data.values || [];
     let targetRow = 0;
 
@@ -1313,7 +1316,7 @@ async function updateItem(type, data) {
         data.so_ngay_tre !== undefined ? String(data.so_ngay_tre) : (calcDaysLate || cur[13] || ''),             // N: Số ngày trễ
         data.danh_gia !== undefined ? String(data.danh_gia) : (calcEval || cur[14] || ''),                       // O: Đánh giá
         data.don_vi_phoi_hop !== undefined ? String(data.don_vi_phoi_hop) : (cur[15] || ''),                     // P: Đơn vị / Người phối hợp
-        data.lanh_dao !== undefined ? String(data.lanh_dao) : (cur[16] || '')                                     // Q: Lãnh đạo giao
+        (data.lanh_dao !== undefined ? String(data.lanh_dao) : (data.lanhDao !== undefined ? String(data.lanhDao) : (data.selectedLeader !== undefined ? String(data.selectedLeader) : (cur[16] || '')))) // Q: Lãnh đạo giao
       ];
 
       await sheets.spreadsheets.values.update({
@@ -1559,7 +1562,7 @@ async function deleteItem(type, id, data) {
   }
 
   if (type === 'leadership_tasks' || type === 'leadership-tasks' || type === 'tasks_lanh_dao') {
-    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Tasks_LanhDao_TheoDoi!A:P' });
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Tasks_LanhDao_TheoDoi!A:Q' });
     const rows = res.data.values || [];
     let targetRow = 0;
 

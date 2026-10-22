@@ -312,6 +312,7 @@ app.post('/api/export-excel', async (req, res) => {
       excelRows = tasks.map((task, index) => ({
         'STT': index + 1,
         'Mã CV': task.ma_cv || `LD${String(index + 1).padStart(3, '0')}`,
+        'Lãnh đạo giao': task.lanh_dao || '',
         'Nơi ban hành': task.noi_ban_hanh || '',
         'Số công văn': task.so_cong_van || '',
         'Tên công việc': task.ten_cong_viec || '',
@@ -332,6 +333,7 @@ app.post('/api/export-excel', async (req, res) => {
       colWidths = [
         { wch: 6 },  // STT
         { wch: 12 }, // Mã CV
+        { wch: 22 }, // Lãnh đạo giao
         { wch: 22 }, // Nơi ban hành
         { wch: 22 }, // Số công văn
         { wch: 45 }, // Tên công việc

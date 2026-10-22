@@ -865,8 +865,12 @@ function App() {
       return;
     }
     const nextId = leadershipTasks.reduce((max, t) => Math.max(max, Number(t.id) || 0), 0) + 1;
+    const defaultLeader = (categories?.leaders?.filter(l => typeof l === 'object' ? l.status !== 'Ẩn' : true).map(l => typeof l === 'object' ? l.name : l).filter(Boolean)[0]) || 'BT - Trần Thanh Hải';
+    const leaderVal = newTaskData.lanh_dao || newTaskData.lanhDao || newTaskData.selectedLeader || defaultLeader;
+
     const newTask = {
       id: nextId,
+      lanh_dao: leaderVal,
       noi_ban_hanh: newTaskData.noi_ban_hanh || 'UBND tỉnh',
       so_cong_van: newTaskData.so_cong_van || '',
       ten_cong_viec: newTaskData.ten_cong_viec || '',
@@ -879,7 +883,7 @@ function App() {
       ngay_hoan_thanh: '',
       trang_thai: 'Đang thực hiện',
       ket_qua: newTaskData.ket_qua || '',
-      ghi_chu: '',
+      ghi_chu: newTaskData.ghi_chu || '',
       so_ngay_con_lai: '',
       so_ngay_tre: '',
       danh_gia: calculateEvaluation(newTaskData)
@@ -5835,6 +5839,13 @@ function AddLeadershipTaskModal({ categories, defaultDepartment = '', onClose, o
     };
   });
 
+  // Ensure lanh_dao is synchronized if categories/activeLeadersList finishes loading
+  useEffect(() => {
+    if (!formData.lanh_dao && activeLeadersList.length > 0) {
+      setFormData(prev => ({ ...prev, lanh_dao: activeLeadersList[0] }));
+    }
+  }, [activeLeadersList]);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -5843,9 +5854,14 @@ function AddLeadershipTaskModal({ categories, defaultDepartment = '', onClose, o
       alert('Vui lòng điền đầy đủ Số công văn và Tên công việc!');
       return;
     }
+    const defaultLeader = activeLeadersList[0] || 'BT - Trần Thanh Hải';
+    const leaderToSave = (formData.lanh_dao && formData.lanh_dao.trim() !== '') ? formData.lanh_dao.trim() : defaultLeader;
     setIsSubmitting(true);
     try {
-      await onSubmit(formData);
+      await onSubmit({
+        ...formData,
+        lanh_dao: leaderToSave
+      });
     } finally {
       setIsSubmitting(false);
     }
