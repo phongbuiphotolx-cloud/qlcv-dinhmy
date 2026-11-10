@@ -99,6 +99,7 @@ app.get('/api/data', async (req, res) => {
     res.json({
       tasks: paginatedTasks,
       leadershipTasks: rawData.leadershipTasks || [],
+      partyTasks: rawData.partyTasks || [],
       totalTasks,
       page,
       limit,
@@ -195,6 +196,47 @@ app.get('/api/leadership-tasks', async (req, res) => {
   }
 });
 
+// 2.3 GET /api/party-tasks (Danh sách Quản lý Công việc Đảng - Sheet Taks_Dang)
+app.get('/api/party-tasks', async (req, res) => {
+  try {
+    const rawData = await googleSheets.getData();
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 50;
+
+    let tasks = [...(rawData.partyTasks || [])];
+    const { department, status, search } = req.query;
+
+    if (department) tasks = tasks.filter(t => t.phong_ban === department);
+    if (status) tasks = tasks.filter(t => t.trang_thai === status);
+    if (search) {
+      const q = String(search).toLowerCase().trim();
+      tasks = tasks.filter(t =>
+        (t.ten_cong_viec || '').toLowerCase().includes(q) ||
+        (t.so_cong_van || '').toLowerCase().includes(q) ||
+        (t.ma_cv || '').toLowerCase().includes(q) ||
+        (t.mo_ta || '').toLowerCase().includes(q)
+      );
+    }
+
+    const totalTasks = tasks.length;
+    const totalPages = Math.ceil(totalTasks / limit) || 1;
+    const startIndex = (page - 1) * limit;
+    const paginatedTasks = tasks.slice(startIndex, startIndex + limit);
+
+    res.json({
+      success: true,
+      data: paginatedTasks,
+      totalTasks,
+      page,
+      limit,
+      totalPages
+    });
+  } catch (err) {
+    console.error('Lỗi [GET /api/party-tasks]:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // 3. POST /api/add
 app.post('/api/add', async (req, res) => {
   try {
@@ -227,9 +269,16 @@ app.post('/api/delete', async (req, res) => {
     const { type = 'tasks', id, data, userRole, userDepartment } = req.body || {};
     const targetId = id || data?.id;
 
-    if (type === 'tasks' || type === 'leadership_tasks' || type === 'leadership-tasks' || type === 'tasks_lanh_dao') {
+    const isLeadershipType = type === 'leadership_tasks' || type === 'leadership-tasks' || type === 'tasks_lanh_dao';
+    const isPartyType = type === 'party_tasks' || type === 'party-tasks' || type === 'taks_dang' || type === 'tasks_dang';
+
+    if (type === 'tasks' || isLeadershipType || isPartyType) {
       const currentData = await googleSheets.getData();
-      const list = (type === 'tasks') ? (currentData.tasks || []) : (currentData.leadershipTasks || []);
+      const list = (type === 'tasks')
+        ? (currentData.tasks || [])
+        : isPartyType
+          ? (currentData.partyTasks || [])
+          : (currentData.leadershipTasks || []);
       const targetTask = list.find(t =>
         String(t.id) === String(targetId) ||
         String(t.ma_cv) === String(targetId) ||
@@ -302,13 +351,54 @@ app.post('/api/export-excel', async (req, res) => {
     const { tasks = [], type = 'tasks' } = req.body || {};
 
     const isLeadership = type === 'leadership_tasks' || type === 'leadership-tasks' || type === 'tasks_lanh_dao';
+    const isParty = type === 'party_tasks' || type === 'party-tasks' || type === 'taks_dang' || type === 'tasks_dang';
 
     let excelRows;
     let colWidths;
-    let sheetName = isLeadership ? 'LanhDao_GiaoViec' : 'CongViec';
-    let defaultFilename = isLeadership ? 'Cong_viec_Lanh_dao_giao.xlsx' : 'Danh_sach_cong_viec.xlsx';
+    let sheetName = isParty ? 'CongViec_Dang' : (isLeadership ? 'LanhDao_GiaoViec' : 'CongViec');
+    let defaultFilename = isParty ? 'Danh_sach_cong_viec_Dang.xlsx' : (isLeadership ? 'Cong_viec_Lanh_dao_giao.xlsx' : 'Danh_sach_cong_viec.xlsx');
 
-    if (isLeadership) {
+    if (isParty) {
+      excelRows = tasks.map((task, index) => ({
+        'STT': index + 1,
+        'Mã CV': task.ma_cv || `CVD${String(index + 1).padStart(3, '0')}`,
+        'Nơi ban hành': task.noi_ban_hanh || '',
+        'Số Công văn': task.so_cong_van || '',
+        'Tên công việc': task.ten_cong_viec || '',
+        'Mô tả': task.mo_ta || '',
+        'Phòng ban': task.phong_ban || '',
+        'Ngày tạo': task.ngay_tao || '',
+        'Deadline': task.deadline || '',
+        'Ngày hoàn thành': task.ngay_hoan_thanh || '',
+        'Trạng thái': task.trang_thai || '',
+        'Kết quả (Sản phẩm, Văn bản ban hành)': task.ket_qua || '',
+        'Ghi chú': task.ghi_chu || '',
+        'Số ngày còn lại': task.so_ngay_con_lai || '',
+        'Số ngày trễ': task.so_ngay_tre || '',
+        'Đánh giá': googleSheets.calculateEvaluation ? googleSheets.calculateEvaluation(task) : (task.danh_gia || ''),
+        'Đơn vị phối hợp': task.don_vi_phoi_hop || ''
+      }));
+
+      colWidths = [
+        { wch: 6 },  // STT
+        { wch: 12 }, // Mã CV
+        { wch: 24 }, // Nơi ban hành
+        { wch: 22 }, // Số Công văn
+        { wch: 45 }, // Tên công việc
+        { wch: 35 }, // Mô tả
+        { wch: 20 }, // Phòng ban
+        { wch: 14 }, // Ngày tạo
+        { wch: 14 }, // Deadline
+        { wch: 16 }, // Ngày hoàn thành
+        { wch: 16 }, // Trạng thái
+        { wch: 30 }, // Kết quả
+        { wch: 25 }, // Ghi chú
+        { wch: 16 }, // Số ngày còn lại
+        { wch: 14 }, // Số ngày trễ
+        { wch: 16 }, // Đánh giá
+        { wch: 25 }  // Đơn vị phối hợp
+      ];
+    } else if (isLeadership) {
       excelRows = tasks.map((task, index) => ({
         'STT': index + 1,
         'Mã CV': task.ma_cv || `LD${String(index + 1).padStart(3, '0')}`,

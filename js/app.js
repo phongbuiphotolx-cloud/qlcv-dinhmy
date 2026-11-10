@@ -216,6 +216,9 @@ const ROUTE_MAP = {
   '/quan-ly-cong-viec': 'tasks',
   '/cong-viec': 'tasks',
   '/tasks': 'tasks',
+  '/cong-viec-dang': 'party-tasks',
+  '/quan-ly-cong-viec-dang': 'party-tasks',
+  '/party-tasks': 'party-tasks',
   '/lanh-dao-giao-viec': 'leadership-tasks',
   '/cong-viec-lanh-dao': 'leadership-tasks',
   '/cong-viec-lanh-dao-giao': 'leadership-tasks',
@@ -238,6 +241,7 @@ const ROUTE_MAP = {
 const TAB_TO_ROUTE = {
   'dashboard': '/dashboard',
   'tasks': '/quan-ly-cong-viec',
+  'party-tasks': '/cong-viec-dang',
   'leadership-tasks': '/lanh-dao-giao-viec',
   'leadership-reports': '/bao-cao-lanh-dao-giao-viec',
   'employees': '/cong-chuc',
@@ -319,6 +323,7 @@ function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [tasks, setTasks] = useState(() => sortTasksDeterministically(window.INITIAL_TASKS || []));
   const [leadershipTasks, setLeadershipTasks] = useState(() => sortTasksDeterministically(window.INITIAL_LEADERSHIP_TASKS || []));
+  const [partyTasks, setPartyTasks] = useState(() => sortTasksDeterministically(window.INITIAL_PARTY_TASKS || []));
   const [employees, setEmployees] = useState(window.INITIAL_EMPLOYEES || []);
   const [categories, setCategories] = useState(window.INITIAL_CATEGORIES || {});
 
@@ -354,6 +359,9 @@ function App() {
         if (data.leadershipTasks && Array.isArray(data.leadershipTasks)) {
           setLeadershipTasks(sortTasksDeterministically(data.leadershipTasks));
         }
+        if (data.partyTasks && Array.isArray(data.partyTasks)) {
+          setPartyTasks(sortTasksDeterministically(data.partyTasks));
+        }
         if (data.employees && Array.isArray(data.employees)) {
           setEmployees(data.employees);
         }
@@ -388,6 +396,7 @@ function App() {
   }, []);
   const [selectedTaskIds, setSelectedTaskIds] = useState([]);
   const [selectedLeadershipTaskIds, setSelectedLeadershipTaskIds] = useState([]);
+  const [selectedPartyTaskIds, setSelectedPartyTaskIds] = useState([]);
   const [modals, setModals] = useState({
     addTask: false,
     editTask: null,
@@ -395,10 +404,15 @@ function App() {
     addLeadershipTask: false,
     editLeadershipTask: null,
     leadershipTaskDetail: null,
+    addPartyTask: false,
+    editPartyTask: null,
+    partyTaskDetail: null,
     confirmDelete: null,
     confirmBulkDelete: false,
     confirmDeleteLeadership: null,
     confirmBulkDeleteLeadership: false,
+    confirmDeleteParty: null,
+    confirmBulkDeleteParty: false,
     mobileFilter: false
   });
 
@@ -575,6 +589,12 @@ function App() {
     if (hasAllDeptAccess) return leadershipTasks;
     return leadershipTasks.filter(t => t.phong_ban === userDept);
   }, [leadershipTasks, hasAllDeptAccess, userDept]);
+
+  // Department party task filtering according to role
+  const visiblePartyTasks = useMemo(() => {
+    if (hasAllDeptAccess) return partyTasks;
+    return partyTasks.filter(t => t.phong_ban === userDept);
+  }, [partyTasks, hasAllDeptAccess, userDept]);
 
   // Recalculate KPIs dynamically for visible tasks
   const kpiData = useMemo(() => {
@@ -1156,6 +1176,301 @@ function App() {
     }
   };
 
+  // Handlers for Party Tasks (Quản lý Công việc Đảng - Sheet Taks_Dang)
+  const handleCreatePartyTask = async (newTaskData) => {
+    if (isViewOnly) {
+      addToast('danger', 'Từ chối truy cập', 'Tài khoản VIEW chỉ có quyền xem, không thể thêm mới công việc!');
+      return;
+    }
+    const nextId = partyTasks.reduce((max, t) => Math.max(max, Number(t.id) || 0), 0) + 1;
+    const defaultPartyAgency = (categories?.partyAgencies && categories.partyAgencies.length > 0)
+      ? categories.partyAgencies[0]
+      : 'Đảng ủy xã Định Mỹ';
+
+    const newTask = {
+      id: nextId,
+      ma_cv: String(nextId),
+      noi_ban_hanh: newTaskData.noi_ban_hanh || defaultPartyAgency,
+      so_cong_van: newTaskData.so_cong_van || '',
+      ten_cong_viec: newTaskData.ten_cong_viec || '',
+      mo_ta: newTaskData.mo_ta || '',
+      phong_ban: newTaskData.phong_ban || (userDept !== 'ALL' ? userDept : 'Văn phòng Đảng ủy'),
+      nguoi_phu_trach: '',
+      don_vi_phoi_hop: newTaskData.don_vi_phoi_hop || '',
+      ngay_tao: newTaskData.ngay_tao || formatDate(new Date()),
+      deadline: newTaskData.deadline || '',
+      ngay_hoan_thanh: '',
+      trang_thai: 'Đang thực hiện',
+      ket_qua: newTaskData.ket_qua || '',
+      ghi_chu: newTaskData.ghi_chu || '',
+      so_ngay_con_lai: '',
+      so_ngay_tre: '',
+      danh_gia: calculateEvaluation(newTaskData)
+    };
+
+    setPartyTasks(prev => sortTasksDeterministically([newTask, ...prev]));
+    setModals(prev => ({ ...prev, addPartyTask: false }));
+    addToast('success', 'Thành công', 'Thêm mới Công việc Đảng thành công');
+    setIsSyncing(true);
+
+    try {
+      const res = await fetch('/api/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify({ type: 'party_tasks', data: newTask })
+      });
+      if (res.ok) {
+        await refreshDataFromBackend(true);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        addToast('danger', 'Lỗi lưu dữ liệu', `Không thể lưu vào sheet Taks_Dang: ${errData.error || res.status}`);
+        await refreshDataFromBackend(true);
+      }
+    } catch (e) {
+      console.error('Background sync add party task error:', e);
+      addToast('danger', 'Lỗi kết nối', 'Không thể kết nối đến máy chủ!');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleUpdatePartyTask = async (updatedTask) => {
+    if (isViewOnly) {
+      addToast('danger', 'Từ chối truy cập', 'Tài khoản VIEW chỉ có quyền xem, không thể chỉnh sửa công việc!');
+      return;
+    }
+
+    if (!updatedTask || !updatedTask.id) {
+      addToast('danger', 'Lỗi dữ liệu', 'Không tìm thấy ID công việc để cập nhật!');
+      return;
+    }
+
+    const originalTask = partyTasks.find(t => t.id === updatedTask.id);
+    const fullPayload = {
+      ...originalTask,
+      ...updatedTask,
+      excel_row: updatedTask.excel_row || originalTask?.excel_row || null
+    };
+
+    setPartyTasks(prev => sortTasksDeterministically(prev.map(t => t.id === updatedTask.id ? { ...t, ...fullPayload } : t)));
+    setModals(prev => ({ ...prev, editPartyTask: null }));
+    addToast('success', 'Thành công', 'Cập nhật Công việc Đảng thành công');
+    setIsSyncing(true);
+
+    try {
+      const res = await fetch('/api/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify({ type: 'party_tasks', data: fullPayload })
+      });
+      if (res.ok) {
+        await refreshDataFromBackend(true);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        addToast('danger', 'Lỗi cập nhật', `Không thể lưu vào Google Sheets: ${errData.error || res.status}`);
+        await refreshDataFromBackend(true);
+      }
+    } catch (e) {
+      console.error('Background sync update party task error:', e);
+      addToast('danger', 'Lỗi kết nối', 'Không thể kết nối đến server backend local!');
+      await refreshDataFromBackend(true);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleDeletePartyTask = async (taskId) => {
+    if (isViewOnly) {
+      addToast('danger', 'Từ chối truy cập', 'Tài khoản VIEW chỉ có quyền xem, không thể xóa công việc!');
+      return;
+    }
+    const target = partyTasks.find(t => t.id === taskId || t.ma_cv === taskId);
+    if (!target) return;
+
+    if (target.trang_thai === 'Hoàn thành' && !isAdmin) {
+      addToast('danger', 'Từ chối truy cập', 'Công việc đã hoàn thành: Chỉ tài khoản Quản trị tối cao (Admin / quyền ALL) mới có quyền xóa!');
+      return;
+    }
+
+    const previousTasks = [...partyTasks];
+
+    setPartyTasks(prev => sortTasksDeterministically(prev.filter(t => t.id !== target.id && (!target.ma_cv || t.ma_cv !== target.ma_cv))));
+    setModals(prev => ({ ...prev, confirmDeleteParty: null }));
+    setIsSyncing(true);
+
+    try {
+      const res = await fetch('/api/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify({
+          type: 'party_tasks',
+          id: target.id,
+          data: {
+            id: target.id,
+            ma_cv: target.ma_cv,
+            excel_row: target.excel_row,
+            so_cong_van: target.so_cong_van,
+            ten_cong_viec: target.ten_cong_viec,
+            phong_ban: target.phong_ban,
+            trang_thai: target.trang_thai
+          },
+          userRole: user?.role,
+          userDepartment: user?.department
+        })
+      });
+
+      const resData = await res.json().catch(() => ({}));
+
+      if (!res.ok || resData.success === false) {
+        setPartyTasks(previousTasks);
+        addToast('danger', 'Lỗi xóa công việc', resData.error || 'Máy chủ Google Sheets từ chối yêu cầu xóa!');
+        await refreshDataFromBackend(true);
+      } else {
+        setPartyTasks(prev => sortTasksDeterministically(prev.filter(t => t.id !== target.id && (!target.ma_cv || t.ma_cv !== target.ma_cv))));
+        addToast('success', 'Đã xóa thành công', `Đã xóa vĩnh viễn công việc "${target.ten_cong_viec || target.ma_cv || target.so_cong_van}" khỏi sheet Taks_Dang!`);
+        await refreshDataFromBackend(true);
+      }
+    } catch (e) {
+      console.error('Lỗi khi xóa công việc Đảng:', e);
+      setPartyTasks(previousTasks);
+      addToast('danger', 'Lỗi kết nối máy chủ', `Không thể kết nối đến máy chủ: ${e.message || 'Lỗi mạng'}`);
+      await refreshDataFromBackend(true);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleBulkCompleteParty = async () => {
+    if (isViewOnly || selectedPartyTaskIds.length === 0) return;
+
+    const selectedTasks = partyTasks.filter(t => selectedPartyTaskIds.includes(t.id));
+    const count = selectedTasks.length;
+    if (count === 0) return;
+
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, '0');
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yyyy = now.getFullYear();
+    const todayFormatted = `${dd}/${mm}/${yyyy}`;
+
+    setPartyTasks(prev => sortTasksDeterministically(prev.map(t => {
+      if (selectedPartyTaskIds.includes(t.id)) {
+        return {
+          ...t,
+          trang_thai: 'Hoàn thành',
+          ngay_hoan_thanh: todayFormatted,
+          danh_gia: calculateEvaluation({ ...t, trang_thai: 'Hoàn thành', ngay_hoan_thanh: todayFormatted })
+        };
+      }
+      return t;
+    })));
+    setSelectedPartyTaskIds([]);
+    addToast('success', 'Hoàn thành hàng loạt', `Đã chuyển ${count} công việc Đảng sang trạng thái "Hoàn thành" và lưu vào Google Sheets!`);
+    setIsSyncing(true);
+
+    try {
+      await Promise.all(selectedTasks.map(task => {
+        const updateData = {
+          ...task,
+          trang_thai: 'Hoàn thành',
+          ngay_hoan_thanh: todayFormatted,
+          danh_gia: calculateEvaluation({ ...task, trang_thai: 'Hoàn thành', ngay_hoan_thanh: todayFormatted })
+        };
+        return fetch('/api/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json; charset=utf-8' },
+          body: JSON.stringify({ type: 'party_tasks', data: updateData })
+        });
+      }));
+      await refreshDataFromBackend(true);
+    } catch (e) {
+      console.error('Lỗi khi cập nhật hoàn thành hàng loạt công việc Đảng:', e);
+      addToast('danger', 'Lỗi kết nối Cloud', 'Không thể kết nối đến máy chủ Google Sheets!');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleRequestBulkDeleteParty = () => {
+    if (isViewOnly || selectedPartyTaskIds.length === 0) return;
+    if (!isAdmin) {
+      const selectedTasks = partyTasks.filter(t => selectedPartyTaskIds.includes(t.id));
+      const hasCompleted = selectedTasks.some(t => t.trang_thai === 'Hoàn thành');
+      if (hasCompleted) {
+        addToast('danger', 'Từ chối truy cập', 'Danh sách đã chọn chứa công việc đã hoàn thành. Chỉ Admin mới có quyền xóa công việc đã hoàn thành!');
+        return;
+      }
+    }
+    setModals(prev => ({ ...prev, confirmBulkDeleteParty: true }));
+  };
+
+  const handleConfirmBulkDeleteParty = async () => {
+    if (isViewOnly || selectedPartyTaskIds.length === 0) return;
+    setModals(prev => ({ ...prev, confirmBulkDeleteParty: false }));
+
+    let selectedTasks = partyTasks.filter(t => selectedPartyTaskIds.includes(t.id));
+    if (!isAdmin) {
+      selectedTasks = selectedTasks.filter(t => t.trang_thai !== 'Hoàn thành');
+    }
+    const count = selectedTasks.length;
+    if (count === 0) {
+      addToast('warning', 'Thông báo', 'Không có công việc nào hợp lệ để xóa.');
+      return;
+    }
+
+    const previousTasks = [...partyTasks];
+    const idsToDelete = selectedTasks.map(t => t.id);
+    const maCvsToDelete = selectedTasks.map(t => t.ma_cv).filter(Boolean);
+
+    setPartyTasks(prev => sortTasksDeterministically(prev.filter(t => !idsToDelete.includes(t.id) && !maCvsToDelete.includes(t.ma_cv))));
+    setSelectedPartyTaskIds([]);
+    setIsSyncing(true);
+
+    try {
+      let failedCount = 0;
+      let lastErrorMessage = '';
+
+      for (const task of selectedTasks) {
+        const res = await fetch('/api/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json; charset=utf-8' },
+          body: JSON.stringify({
+            type: 'party_tasks',
+            id: task.id,
+            data: {
+              id: task.id,
+              ma_cv: task.ma_cv,
+              excel_row: task.excel_row,
+              so_cong_van: task.so_cong_van,
+              ten_cong_viec: task.ten_cong_viec
+            },
+            userRole: user?.role,
+            userDepartment: user?.department
+          })
+        });
+        const resData = await res.json().catch(() => ({}));
+        if (!res.ok || resData.success === false) {
+          failedCount++;
+          lastErrorMessage = resData.error || 'Lỗi máy chủ';
+        }
+      }
+
+      if (failedCount > 0) {
+        addToast('warning', 'Cảnh báo xóa hàng loạt', `Đã xóa ${count - failedCount}/${count} công việc. Lỗi: ${lastErrorMessage}`);
+      } else {
+        addToast('success', 'Đã xóa hàng loạt', `Đã xóa thành công ${count} Công việc Đảng khỏi Google Sheets!`);
+      }
+      await refreshDataFromBackend(true);
+    } catch (e) {
+      console.error('Lỗi khi xóa hàng loạt công việc Đảng:', e);
+      setPartyTasks(previousTasks);
+      addToast('danger', 'Lỗi kết nối Cloud', `Không thể kết nối đến máy chủ Google Sheets: ${e.message}`);
+      await refreshDataFromBackend(true);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   // Refresh Lucide icons whenever state changes
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -1164,7 +1479,7 @@ function App() {
       }
     }, 50);
     return () => clearTimeout(timer);
-  }, [activeTab, user, modals, tasks, leadershipTasks, selectedTaskIds, selectedLeadershipTaskIds]);
+  }, [activeTab, user, modals, tasks, leadershipTasks, partyTasks, selectedTaskIds, selectedLeadershipTaskIds, selectedPartyTaskIds]);
 
   // If user is not logged in, show Login Screen
   if (!user) {
@@ -1208,7 +1523,7 @@ function App() {
           dbConnected={dbConnected}
           isSidebarCollapsed={isSidebarCollapsed}
           onToggleSidebar={() => setIsSidebarCollapsed(prev => !prev)}
-          tasks={[...visibleTasks, ...visibleLeadershipTasks]}
+          tasks={[...visibleTasks, ...visibleLeadershipTasks, ...visiblePartyTasks]}
           onOpenTaskDetail={(task) => setModals(prev => ({ ...prev, taskDetail: task }))}
         />
 
@@ -1241,6 +1556,23 @@ function App() {
               onOpenMobileFilter={() => setModals(prev => ({ ...prev, mobileFilter: true }))}
               categories={categories}
               isViewOnly={isViewOnly}
+            />
+          )}
+          {activeTab === 'party-tasks' && (
+            <PartyTasksView
+              tasks={visiblePartyTasks}
+              user={user}
+              selectedTaskIds={selectedPartyTaskIds}
+              setSelectedTaskIds={setSelectedPartyTaskIds}
+              onOpenAddTask={() => setModals(prev => ({ ...prev, addPartyTask: true }))}
+              onOpenEditTask={(task) => setModals(prev => ({ ...prev, editPartyTask: task }))}
+              onOpenDetail={(task) => setModals(prev => ({ ...prev, partyTaskDetail: task }))}
+              onConfirmDelete={(id) => setModals(prev => ({ ...prev, confirmDeleteParty: id }))}
+              onBulkDelete={handleRequestBulkDeleteParty}
+              onBulkComplete={handleBulkCompleteParty}
+              categories={categories}
+              isViewOnly={isViewOnly}
+              addToast={addToast}
             />
           )}
           {activeTab === 'leadership-tasks' && (
@@ -1403,6 +1735,53 @@ function App() {
         />
       )}
 
+      {/* Party Task Modals (Công việc Đảng) */}
+      {modals.addPartyTask && !isViewOnly && (
+        <AddPartyTaskModal
+          categories={categories}
+          defaultDepartment={userDept}
+          onClose={() => setModals(prev => ({ ...prev, addPartyTask: false }))}
+          onSubmit={handleCreatePartyTask}
+        />
+      )}
+
+      {modals.editPartyTask && !isViewOnly && (
+        <EditPartyTaskModal
+          task={modals.editPartyTask}
+          categories={categories}
+          onClose={() => setModals(prev => ({ ...prev, editPartyTask: null }))}
+          onSubmit={handleUpdatePartyTask}
+        />
+      )}
+
+      {modals.partyTaskDetail && (
+        <PartyTaskDetailModal
+          task={modals.partyTaskDetail}
+          isViewOnly={isViewOnly}
+          onClose={() => setModals(prev => ({ ...prev, partyTaskDetail: null }))}
+          onOpenEditTask={(t) => setModals(prev => ({ ...prev, partyTaskDetail: null, editPartyTask: t }))}
+          onOpenPrintSubmission={(t) => setModals(prev => ({ ...prev, partyTaskDetail: null, printSubmission: t }))}
+        />
+      )}
+
+      {modals.confirmDeleteParty && !isViewOnly && (
+        <ConfirmModal
+          title="Xác nhận xóa Công việc Đảng"
+          message="Bạn có chắc chắn muốn xóa công việc Đảng này khỏi sheet Taks_Dang? Thao tác này không thể hoàn tác."
+          onClose={() => setModals(prev => ({ ...prev, confirmDeleteParty: null }))}
+          onConfirm={() => handleDeletePartyTask(modals.confirmDeleteParty)}
+        />
+      )}
+
+      {modals.confirmBulkDeleteParty && !isViewOnly && (
+        <ConfirmModal
+          title="Xác nhận xóa hàng loạt Công việc Đảng"
+          message={`Bạn có chắc chắn muốn xóa ${selectedPartyTaskIds.length} công việc Đảng đã chọn? Thao tác này sẽ xóa vĩnh viễn dữ liệu khỏi sheet Taks_Dang và không thể hoàn tác.`}
+          onClose={() => setModals(prev => ({ ...prev, confirmBulkDeleteParty: false }))}
+          onConfirm={handleConfirmBulkDeleteParty}
+        />
+      )}
+
       {modals.printSubmission && (
         <SubmissionPrintModal
           task={modals.printSubmission}
@@ -1469,6 +1848,7 @@ function Sidebar({ activeTab, setActiveTab, user, onLogout, isCollapsed = false,
       icon: 'bot'
     },
     { id: 'tasks', label: 'Quản lý công việc', icon: 'check-square' },
+    { id: 'party-tasks', label: 'Quản lý Công việc Đảng', icon: 'flag' },
     { id: 'leadership-tasks', label: 'Lãnh đạo giao việc', icon: 'badge-check' },
     { id: 'leadership-reports', label: 'Báo cáo Lãnh đạo giao', icon: 'file-bar-chart-2' },
     { id: 'kpi', label: 'Đánh giá công việc', icon: 'award' },
@@ -1759,6 +2139,7 @@ function Topbar({ user, activeTab, setActiveTab, onOpenMobileDrawer, onLogout, d
     switch (activeTab) {
       case 'dashboard': return 'Dashboard';
       case 'tasks': return 'Quản lý công việc';
+      case 'party-tasks': return 'Quản lý Công việc Đảng';
       case 'leadership-tasks': return 'Lãnh đạo giao việc';
       case 'leadership-reports': return 'Báo cáo Lãnh đạo giao việc';
       case 'employees': return 'Nhân viên';
@@ -2045,6 +2426,7 @@ function MobileDrawer({ isOpen, onClose, activeTab, setActiveTab, user, onLogout
       icon: 'bot'
     },
     { id: 'tasks', label: 'Quản lý công việc', icon: 'check-square' },
+    { id: 'party-tasks', label: 'Quản lý Công việc Đảng', icon: 'flag' },
     { id: 'leadership-tasks', label: 'Lãnh đạo giao việc', icon: 'badge-check' },
     { id: 'leadership-reports', label: 'Báo cáo Lãnh đạo giao', icon: 'file-bar-chart-2' },
     { id: 'kpi', label: 'Đánh giá công việc', icon: 'award' },
@@ -11746,6 +12128,1327 @@ function ConfirmModal({ title, message, onClose, onConfirm }) {
               <span>Xác nhận xóa</span>
             )}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------
+// PARTY TASKS VIEW (QUẢN LÝ CÔNG VIỆC ĐẢNG - SHEET Taks_Dang)
+// ----------------------------------------------------------------------
+function PartyTasksView({
+  tasks,
+  user,
+  selectedTaskIds,
+  setSelectedTaskIds,
+  onOpenAddTask,
+  onOpenEditTask,
+  onOpenDetail,
+  onConfirmDelete,
+  onBulkDelete,
+  onBulkComplete,
+  categories,
+  isViewOnly,
+  addToast
+}) {
+  const isAdmin = user?.role === 'ADMIN';
+  const hasAllDeptAccess = user?.role === 'ADMIN' || user?.role === 'ALL' || user?.department === 'ALL';
+  const userDept = user?.department || '';
+  const isDeptRestricted = !hasAllDeptAccess && userDept && userDept !== 'ALL';
+
+  const departmentList = useMemo(() => {
+    let list = [];
+    if (categories?.departments && Array.isArray(categories.departments) && categories.departments.length > 0) {
+      list = categories.departments;
+    } else {
+      list = window.INITIAL_CATEGORIES?.departments || ['Văn phòng Đảng ủy', 'Ban Xây dựng Đảng', 'Ủy ban Kiểm tra Đảng ủy', 'Khối Dân vận', 'Kinh tế', 'VH - XH', 'Văn phòng UBND'];
+    }
+    return list.map(d => String(d || '').trim()).filter(Boolean);
+  }, [categories]);
+
+  // Nguồn dữ liệu Nơi ban hành lấy trực tiếp từ Cột R của sheet Settings (categories.partyAgencies)
+  const partyAgencyList = useMemo(() => {
+    const colRList = (categories?.partyAgencies && Array.isArray(categories.partyAgencies))
+      ? categories.partyAgencies.map(a => String(a || '').trim()).filter(Boolean)
+      : [];
+    const fromTasks = (tasks || []).map(t => String(t.noi_ban_hanh || '').trim()).filter(Boolean);
+    const merged = Array.from(new Set([...colRList, ...fromTasks]));
+    if (merged.length > 0) return merged;
+    return ['Tỉnh ủy An Giang', 'Huyện ủy Châu Phú', 'Đảng ủy xã Định Mỹ', 'Ban Tổ chức Tỉnh ủy', 'Ủy ban Kiểm tra Tỉnh ủy', 'Ban Tuyên giáo Tỉnh ủy'];
+  }, [categories, tasks]);
+
+  const [draftFilters, setDraftFilters] = useState(() => ({
+    taskName: '',
+    docNo: '',
+    agency: '',
+    department: isDeptRestricted ? userDept : '',
+    status: '',
+    rating: '',
+    fromDate: '',
+    toDate: ''
+  }));
+
+  useEffect(() => {
+    if (isDeptRestricted) {
+      setDraftFilters(prev => ({ ...prev, department: userDept }));
+      setActiveFilters(prev => ({ ...prev, department: userDept }));
+    }
+  }, [isDeptRestricted, userDept]);
+
+  const [activeFilters, setActiveFilters] = useState(() => ({
+    taskName: '',
+    docNo: '',
+    agency: '',
+    department: isDeptRestricted ? userDept : '',
+    status: '',
+    rating: '',
+    fromDate: '',
+    toDate: ''
+  }));
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [sortField, setSortField] = useState('id');
+  const [sortOrder, setSortOrder] = useState('desc');
+
+  const handleSearch = () => {
+    setActiveFilters({ ...draftFilters });
+    setCurrentPage(1);
+  };
+
+  const handleReset = () => {
+    const emptyFilters = {
+      taskName: '',
+      docNo: '',
+      agency: '',
+      department: isDeptRestricted ? userDept : '',
+      status: '',
+      rating: '',
+      fromDate: '',
+      toDate: ''
+    };
+    setDraftFilters(emptyFilters);
+    setActiveFilters(emptyFilters);
+    setCurrentPage(1);
+  };
+
+  const filteredTasks = useMemo(() => {
+    return (tasks || []).filter(task => {
+      // 1. Tên công việc
+      if (activeFilters.taskName && activeFilters.taskName.trim() !== '') {
+        const q = activeFilters.taskName.trim().toLowerCase();
+        const matchName = task.ten_cong_viec && task.ten_cong_viec.toLowerCase().includes(q);
+        const matchDesc = task.mo_ta && task.mo_ta.toLowerCase().includes(q);
+        if (!matchName && !matchDesc) return false;
+      }
+
+      // 2. Số công văn
+      if (activeFilters.docNo && activeFilters.docNo.trim() !== '') {
+        const q = activeFilters.docNo.trim().toLowerCase();
+        if (!task.so_cong_van || !task.so_cong_van.toLowerCase().includes(q)) return false;
+      }
+
+      // 3. Nơi ban hành
+      if (activeFilters.agency && activeFilters.agency.trim() !== '') {
+        const targetAgency = activeFilters.agency.trim().toLowerCase();
+        const taskAgency = (task.noi_ban_hanh || '').trim().toLowerCase();
+        if (!taskAgency || (taskAgency !== targetAgency && !taskAgency.includes(targetAgency))) return false;
+      }
+
+      // 4. Phòng ban / Ban Đảng
+      if (activeFilters.department && activeFilters.department.trim() !== '') {
+        if (!task.phong_ban || task.phong_ban.trim() !== activeFilters.department.trim()) return false;
+      }
+
+      // 5. Từ ngày -> Đến ngày (task.ngay_tao)
+      const fromTime = activeFilters.fromDate ? parseDateToTimestamp(activeFilters.fromDate) : 0;
+      const toTime = activeFilters.toDate ? parseDateToTimestamp(activeFilters.toDate) : 0;
+
+      if (fromTime > 0 || toTime > 0) {
+        const taskTime = parseDateToTimestamp(task.ngay_tao);
+        if (taskTime === 0) return false;
+        if (fromTime > 0 && taskTime < fromTime) return false;
+        if (toTime > 0 && taskTime > (toTime + 86400000 - 1)) return false;
+      }
+
+      // 6. Trạng thái
+      if (activeFilters.status && task.trang_thai !== activeFilters.status) {
+        return false;
+      }
+
+      // 7. Đánh giá
+      if (activeFilters.rating && activeFilters.rating.trim() !== '') {
+        const evalVal = calculateEvaluation(task);
+        if (evalVal !== activeFilters.rating.trim()) return false;
+      }
+
+      return true;
+    }).sort((a, b) => {
+      let aVal = a[sortField];
+      let bVal = b[sortField];
+
+      if (sortField === 'ngay_tao' || sortField === 'deadline' || sortField === 'ngay_hoan_thanh') {
+        const timeA = parseDateToTimestamp(aVal);
+        const timeB = parseDateToTimestamp(bVal);
+        if (timeA !== timeB) {
+          return sortOrder === 'asc' ? timeA - timeB : timeB - timeA;
+        }
+      } else {
+        if (aVal === undefined || aVal === null) aVal = '';
+        if (bVal === undefined || bVal === null) bVal = '';
+
+        if (aVal !== bVal) {
+          if (typeof aVal === 'number' && typeof bVal === 'number') {
+            return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+          }
+          const comp = String(aVal).localeCompare(String(bVal), 'vi', { numeric: true });
+          if (comp !== 0) {
+            return sortOrder === 'asc' ? comp : -comp;
+          }
+        }
+      }
+
+      const aId = Number(a.id) || 0;
+      const bId = Number(b.id) || 0;
+      return sortOrder === 'asc' ? aId - bId : bId - aId;
+    });
+  }, [tasks, activeFilters, sortField, sortOrder]);
+
+  const totalPages = Math.ceil(filteredTasks.length / pageSize) || 1;
+  const paginatedTasks = filteredTasks.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const toggleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedTaskIds(paginatedTasks.map(t => t.id));
+    } else {
+      setSelectedTaskIds([]);
+    }
+  };
+
+  const toggleSelectTask = (id) => {
+    setSelectedTaskIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const handleExportExcel = async () => {
+    if (!filteredTasks || filteredTasks.length === 0) {
+      if (addToast) addToast('warning', 'Không có dữ liệu', 'Không có Công việc Đảng nào khớp với bộ lọc hiện tại để xuất Excel!');
+      return;
+    }
+
+    try {
+      if (window.XLSX) {
+        const excelRows = filteredTasks.map((task) => ({
+          'Mã CV': task.ma_cv || task.id || '',
+          'Nơi ban hành': task.noi_ban_hanh || '',
+          'Số Công văn': task.so_cong_van || '',
+          'Tên công việc': task.ten_cong_viec || '',
+          'Mô tả': task.mo_ta || '',
+          'Phòng ban': task.phong_ban || '',
+          'Ngày tạo': formatDate(task.ngay_tao),
+          'Deadline': formatDate(task.deadline),
+          'Ngày hoàn thành': formatDate(task.ngay_hoan_thanh),
+          'Trạng thái': task.trang_thai || '',
+          'Kết quả (Sản phẩm, Văn bản ban hành)': task.ket_qua || '',
+          'Ghi chú': task.ghi_chu || '',
+          'Số ngày còn lại': task.so_ngay_con_lai || '',
+          'Số ngày trễ': task.so_ngay_tre || '',
+          'Đánh giá': calculateEvaluation(task) || task.danh_gia || '',
+          'Đơn vị phối hợp': task.don_vi_phoi_hop || ''
+        }));
+
+        const worksheet = window.XLSX.utils.json_to_sheet(excelRows);
+        worksheet['!cols'] = [
+          { wch: 10 }, // A: Mã CV
+          { wch: 24 }, // B: Nơi ban hành
+          { wch: 20 }, // C: Số Công văn
+          { wch: 45 }, // D: Tên công việc
+          { wch: 35 }, // E: Mô tả
+          { wch: 22 }, // F: Phòng ban
+          { wch: 14 }, // G: Ngày tạo
+          { wch: 14 }, // H: Deadline
+          { wch: 16 }, // I: Ngày hoàn thành
+          { wch: 16 }, // J: Trạng thái
+          { wch: 32 }, // K: Kết quả
+          { wch: 25 }, // L: Ghi chú
+          { wch: 15 }, // M: Số ngày còn lại
+          { wch: 14 }, // N: Số ngày trễ
+          { wch: 16 }, // O: Đánh giá
+          { wch: 25 }  // P: Đơn vị phối hợp
+        ];
+
+        const workbook = window.XLSX.utils.book_new();
+        window.XLSX.utils.book_append_sheet(workbook, worksheet, 'Taks_Dang');
+        const now = new Date();
+        const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+        const filename = `Danh_sach_Cong_viec_Dang_${dateStr}.xlsx`;
+        window.XLSX.writeFile(workbook, filename);
+        if (addToast) addToast('success', 'Xuất Excel thành công', `Đã tải xuống ${filteredTasks.length} công việc Đảng ra tệp ${filename}!`);
+        return;
+      }
+
+      const res = await fetch('/api/export-excel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'party_tasks', tasks: filteredTasks })
+      });
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'Danh_sach_cong_viec_Dang.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+      if (addToast) addToast('success', 'Xuất Excel thành công', `Đã tải xuống file Excel cho ${filteredTasks.length} công việc Đảng!`);
+    } catch (e) {
+      console.error('Export Excel error:', e);
+      if (addToast) addToast('danger', 'Lỗi xuất Excel', 'Không thể tạo file Excel. Vui lòng thử lại!');
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      {/* Filter Toolbar */}
+      <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-xs space-y-3">
+        {/* ROW 1: Tên CV, Số CV, Nơi ban hành, Phòng ban / Ban Đảng, Actions (Tìm kiếm, Đặt lại) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 items-end">
+          {/* Col 1: Tên công việc */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
+              <i data-lucide="flag" className="w-3.5 h-3.5 text-rose-600"></i>
+              <span>Tên công việc Đảng</span>
+            </label>
+            <input
+              type="text"
+              placeholder="Nhập tên công việc..."
+              value={draftFilters.taskName}
+              onChange={e => setDraftFilters({ ...draftFilters, taskName: e.target.value })}
+              onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
+              className="form-input w-full"
+            />
+          </div>
+
+          {/* Col 2: Số công văn */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Số công văn</label>
+            <input
+              type="text"
+              placeholder="Nhập số công văn..."
+              value={draftFilters.docNo}
+              onChange={e => setDraftFilters({ ...draftFilters, docNo: e.target.value })}
+              onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
+              className="form-input w-full"
+            />
+          </div>
+
+          {/* Col 3: Nơi ban hành */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Nơi ban hành</label>
+            <select
+              value={draftFilters.agency}
+              onChange={e => setDraftFilters({ ...draftFilters, agency: e.target.value })}
+              className="form-select w-full"
+            >
+              <option value="">-- Tất cả nơi ban hành --</option>
+              {partyAgencyList.map(ag => (
+                <option key={ag} value={ag}>{ag}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Col 4: Phòng ban / Ban Đảng chủ trì */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Phòng ban / Ban Đảng</label>
+            <select
+              value={draftFilters.department}
+              disabled={isDeptRestricted}
+              onChange={e => {
+                if (isDeptRestricted) return;
+                setDraftFilters({ ...draftFilters, department: e.target.value });
+              }}
+              className={`form-select w-full ${isDeptRestricted ? 'bg-slate-100 opacity-90 cursor-not-allowed text-slate-700 font-semibold' : ''}`}
+            >
+              {!isDeptRestricted && <option value="">-- Tất cả phòng ban --</option>}
+              {departmentList.map(dept => (
+                <option key={dept} value={dept}>{dept}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Col 5: Row 1 Actions (Tìm kiếm & Đặt lại) */}
+          <div className="flex items-center gap-2 w-full">
+            <button
+              onClick={handleSearch}
+              className="flex-1 btn-primary text-xs h-[38px] font-semibold whitespace-nowrap shadow-xs justify-center"
+              title="Thực hiện tìm kiếm"
+            >
+              <i data-lucide="search" className="w-3.5 h-3.5"></i> Tìm kiếm
+            </button>
+            <button
+              onClick={handleReset}
+              className="flex-1 btn-secondary text-xs h-[38px] font-medium text-slate-600 whitespace-nowrap justify-center"
+              title="Đặt lại bộ lọc"
+            >
+              <i data-lucide="rotate-ccw" className="w-3.5 h-3.5"></i> Đặt lại
+            </button>
+          </div>
+        </div>
+
+        {/* ROW 2: Trạng thái, Đánh giá, Từ ngày, Đến ngày & Actions (Thêm mới, Xuất Excel) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 items-end pt-1 border-t border-slate-100">
+          {/* Col 1: Trạng thái */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Trạng thái</label>
+            <select
+              value={draftFilters.status}
+              onChange={e => setDraftFilters({ ...draftFilters, status: e.target.value })}
+              className="form-select w-full"
+            >
+              <option value="">-- Tất cả --</option>
+              <option value="Hoàn thành">Hoàn thành</option>
+              <option value="Đang thực hiện">Đang thực hiện</option>
+              <option value="Quá hạn">Quá hạn</option>
+              <option value="Tạm dừng">Tạm dừng</option>
+              <option value="Hủy">Hủy</option>
+            </select>
+          </div>
+
+          {/* Col 2: Đánh giá */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Đánh giá</label>
+            <select
+              value={draftFilters.rating}
+              onChange={e => setDraftFilters({ ...draftFilters, rating: e.target.value })}
+              className="form-select w-full"
+            >
+              <option value="">-- Tất cả --</option>
+              <option value="Trước hạn">Trước hạn</option>
+              <option value="Đúng hạn">Đúng hạn</option>
+              <option value="Đến hạn">Đến hạn</option>
+              <option value="Trễ hạn">Trễ hạn</option>
+            </select>
+          </div>
+
+          {/* Col 3: Từ ngày */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Từ ngày</label>
+            <DateInput
+              value={draftFilters.fromDate}
+              onChange={val => setDraftFilters({ ...draftFilters, fromDate: val })}
+              placeholder="dd/mm/yyyy"
+            />
+          </div>
+
+          {/* Col 4: Đến ngày */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Đến ngày</label>
+            <DateInput
+              value={draftFilters.toDate}
+              onChange={val => setDraftFilters({ ...draftFilters, toDate: val })}
+              placeholder="dd/mm/yyyy"
+            />
+          </div>
+
+          {/* Col 5: Actions (Thêm mới & Xuất Excel) */}
+          <div className="flex items-center gap-2 w-full">
+            {!isViewOnly ? (
+              <button onClick={onOpenAddTask} className="flex-1 btn-primary text-xs h-[38px] font-semibold shadow-xs justify-center">
+                <i data-lucide="plus" className="w-3.5 h-3.5"></i> Thêm mới
+              </button>
+            ) : (
+              <div className="flex-1"></div>
+            )}
+            <button onClick={handleExportExcel} className="flex-1 btn-success text-xs h-[38px] font-semibold shadow-xs justify-center hover:bg-emerald-700 transition-colors" title="Xuất danh sách Công việc Đảng ra file Excel (.xlsx)">
+              <i data-lucide="file-spreadsheet" className="w-3.5 h-3.5"></i> Xuất Excel
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Bulk Actions Bar */}
+      {selectedTaskIds.length > 0 && !isViewOnly && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center justify-between animate-fadeIn">
+          <span className="text-xs font-semibold text-blue-800">
+            Đã chọn <strong className="text-blue-900">{selectedTaskIds.length}</strong> công việc Đảng
+          </span>
+          <div className="flex items-center gap-2">
+            <button onClick={onBulkComplete} className="btn-success h-8 text-xs">
+              <i data-lucide="check-circle" className="w-3.5 h-3.5"></i> Hoàn thành
+            </button>
+            <button onClick={onBulkDelete} className="btn-secondary h-8 text-xs text-rose-600 border-rose-200 hover:bg-rose-50">
+              <i data-lucide="trash-2" className="w-3.5 h-3.5"></i> Xóa
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* DESKTOP TABLE VIEW */}
+      <div className="hidden md:block bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+        <div className="overflow-x-auto custom-scrollbar">
+          <table className="custom-table w-full min-w-[1050px]">
+            <thead>
+              <tr>
+                {!isViewOnly && (
+                  <th className="w-9 text-center px-1">
+                    <input
+                      type="checkbox"
+                      checked={selectedTaskIds.length > 0 && selectedTaskIds.length === paginatedTasks.length}
+                      onChange={toggleSelectAll}
+                      className="rounded border-slate-300 text-blue-600"
+                    />
+                  </th>
+                )}
+                <th className="w-12 text-center px-1">Mã CV</th>
+                <th className="w-32 text-left px-2 break-words">Số công văn / Nơi ban hành</th>
+                <th className="text-left px-2 min-w-[210px]">Tên công việc</th>
+                <th className="w-32 text-left px-2 break-words">Phòng ban / Ban Đảng</th>
+                <th className="w-32 text-left px-2 break-words">Đơn vị phối hợp</th>
+                <th className="w-24 text-center px-1.5 whitespace-nowrap">Ngày tạo</th>
+                <th className="w-24 text-center px-1.5 whitespace-nowrap">Deadline</th>
+                <th className="w-28 text-center px-1.5 whitespace-nowrap">Ngày hoàn thành</th>
+                <th className="w-28 text-center px-1.5 whitespace-nowrap">Trạng thái</th>
+                <th className="w-24 text-center px-1.5 whitespace-nowrap">Đánh giá</th>
+                <th className="w-24 text-center px-1">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedTasks.length === 0 ? (
+                <tr>
+                  <td colSpan={isViewOnly ? 11 : 12} className="py-12 text-center text-slate-400 text-sm">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <i data-lucide="folder-open" className="w-8 h-8 text-slate-300"></i>
+                      <span>Chưa có dữ liệu Công việc Đảng phù hợp với bộ lọc</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                paginatedTasks.map((task, idx) => (
+                  <tr key={task.id || idx} className={selectedTaskIds.includes(task.id) ? 'bg-blue-50/50' : ''}>
+                    {!isViewOnly && (
+                      <td className="text-center px-1">
+                        <input
+                          type="checkbox"
+                          checked={selectedTaskIds.includes(task.id)}
+                          onChange={() => toggleSelectTask(task.id)}
+                          className="rounded border-slate-300 text-blue-600"
+                        />
+                      </td>
+                    )}
+                    <td className="text-slate-500 font-mono text-[11px] font-semibold text-center px-1">
+                      {task.ma_cv || task.id || ((currentPage - 1) * pageSize + idx + 1)}
+                    </td>
+                    <td className="align-top text-xs px-2 py-2 w-32">
+                      <div
+                        className={`font-bold cursor-pointer hover:underline leading-tight break-words ${
+                          isTaskOverdue(task) ? 'text-rose-600 font-extrabold' : 'text-blue-600'
+                        }`}
+                        onClick={() => onOpenDetail(task)}
+                        title={task.so_cong_van}
+                      >
+                        {task.so_cong_van || '--'}
+                      </div>
+                      <div className="text-[11px] text-slate-500 font-medium mt-0.5 truncate" title={task.noi_ban_hanh}>
+                        {task.noi_ban_hanh || '--'}
+                      </div>
+                    </td>
+                    <td className="align-top py-2 px-2 text-xs font-medium text-slate-900 cursor-pointer hover:text-blue-600 min-w-[210px]" onClick={() => onOpenDetail(task)}>
+                      <div className="line-clamp-2 leading-snug" title={task.ten_cong_viec}>
+                        {task.ten_cong_viec}
+                      </div>
+                      {task.mo_ta && (
+                        <div className="text-[11px] text-slate-400 line-clamp-1 mt-0.5" title={task.mo_ta}>
+                          {task.mo_ta}
+                        </div>
+                      )}
+                      {task.ket_qua && (
+                        <div className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-1.5 py-0.5 rounded mt-1 inline-block line-clamp-1" title={`Kết quả: ${task.ket_qua}`}>
+                          KQ: {task.ket_qua}
+                        </div>
+                      )}
+                    </td>
+                    <td className="align-top text-xs px-2 py-2 w-32">
+                      <div className="flex items-center gap-1.5 font-medium text-slate-800">
+                        <i data-lucide="building-2" className="w-3.5 h-3.5 text-slate-400 shrink-0"></i>
+                        <span className="leading-tight">{task.phong_ban || '--'}</span>
+                      </div>
+                    </td>
+                    <td className="align-top text-xs px-2 py-2 w-32">
+                      <div className="text-xs font-medium text-slate-700 leading-tight line-clamp-2" title={task.don_vi_phoi_hop || ''}>
+                        {task.don_vi_phoi_hop && task.don_vi_phoi_hop !== '--' ? task.don_vi_phoi_hop : ''}
+                      </div>
+                    </td>
+                    <td className="text-xs font-medium text-slate-700 align-top text-center py-2 px-1.5 w-24 whitespace-nowrap">{formatDate(task.ngay_tao) !== '--' ? formatDate(task.ngay_tao) : ''}</td>
+                    <td className="text-xs font-medium text-slate-800 align-top text-center py-2 px-1.5 w-24 whitespace-nowrap">{formatDate(task.deadline) !== '--' ? formatDate(task.deadline) : ''}</td>
+                    <td className="text-xs font-medium text-slate-800 align-top text-center py-2 px-1.5 w-28 whitespace-nowrap">{formatDate(task.ngay_hoan_thanh) !== '--' ? formatDate(task.ngay_hoan_thanh) : ''}</td>
+                    <td className="align-top text-center py-2 px-1.5 w-28 whitespace-nowrap"><StatusBadge status={task.trang_thai} /></td>
+                    <td className="align-top text-center py-2 px-1.5 w-24 whitespace-nowrap"><RatingBadge task={task} rating={calculateEvaluation(task)} /></td>
+                    <td className="align-top text-center py-2 px-1 w-24 whitespace-nowrap">
+                      <div className="flex items-center justify-center gap-1.5 opacity-100 visible">
+                        <button
+                          type="button"
+                          onClick={() => onOpenDetail(task)}
+                          className="p-1.5 rounded-lg text-slate-700 hover:text-blue-600 hover:bg-slate-200/80 bg-slate-100 border border-slate-200 transition-colors inline-flex items-center justify-center cursor-pointer shadow-2xs"
+                          title="Xem chi tiết"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                          </svg>
+                        </button>
+                        {!isViewOnly && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => onOpenEditTask(task)}
+                              className="p-1.5 rounded-lg text-blue-600 hover:text-blue-700 hover:bg-blue-100/80 bg-blue-50 border border-blue-200/70 transition-colors inline-flex items-center justify-center cursor-pointer shadow-2xs"
+                              title="Chỉnh sửa thông tin Công việc Đảng"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M12 20h9"></path>
+                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                              </svg>
+                            </button>
+                            {canDeleteTask(task, isAdmin) ? (
+                              <button
+                                type="button"
+                                onClick={() => onConfirmDelete(task.id)}
+                                className="p-1.5 rounded-lg text-rose-600 hover:text-rose-700 hover:bg-rose-100/80 bg-rose-50 border border-rose-200/70 transition-colors inline-flex items-center justify-center cursor-pointer shadow-2xs"
+                                title="Xóa công việc Đảng"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="3 6 5 6 21 6"></polyline>
+                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled
+                                className="p-1.5 rounded-lg text-slate-300 bg-slate-100 border border-slate-200 cursor-not-allowed opacity-40 inline-flex items-center justify-center"
+                                title="Công việc đã hoàn thành: Chỉ Admin mới có quyền xóa"
+                              >
+                                <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="3 6 5 6 21 6"></polyline>
+                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination Footer */}
+        <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+          <div className="flex items-center gap-2">
+            <span>Hiển thị</span>
+            <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }} className="form-select h-8 text-xs py-0">
+              <option value={10}>10 dòng</option>
+              <option value={25}>25 dòng</option>
+              <option value={50}>50 dòng</option>
+              <option value={100}>100 dòng</option>
+            </select>
+            <span>/ Tổng {filteredTasks.length} dòng</span>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40">
+              <i data-lucide="chevron-left" className="w-4 h-4"></i>
+            </button>
+            <span className="px-3 py-1 font-semibold text-slate-700">Trang {currentPage} / {totalPages}</span>
+            <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40">
+              <i data-lucide="chevron-right" className="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* MOBILE CARD LIST VIEW */}
+      <div className="block md:hidden space-y-3">
+        {paginatedTasks.length === 0 ? (
+          <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400 text-sm">
+            Không tìm thấy Công việc Đảng nào
+          </div>
+        ) : (
+          paginatedTasks.map(task => (
+            <div key={task.id} className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs space-y-3">
+              <div className="flex items-start justify-between gap-2">
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
+                  isTaskOverdue(task) ? 'text-rose-600 bg-rose-50 border border-rose-200' : 'text-blue-600 bg-blue-50'
+                }`}>
+                  {task.so_cong_van}
+                </span>
+                <StatusBadge status={task.trang_thai} />
+              </div>
+
+              <h4 onClick={() => onOpenDetail(task)} className="font-bold text-slate-900 text-sm leading-snug cursor-pointer active:text-blue-600">
+                {task.ten_cong_viec}
+              </h4>
+
+              <div className="grid grid-cols-2 gap-2 text-xs text-slate-500 pt-2 border-t border-slate-100">
+                <div>
+                  <span className="block text-[10px] text-slate-400 uppercase font-semibold">Phòng ban / Nơi ban hành</span>
+                  <span className="font-bold text-slate-800">{task.phong_ban || '--'}</span>
+                  <span className="block text-[10px] text-slate-500 mt-0.5 truncate">{task.noi_ban_hanh || '--'}</span>
+                </div>
+                <div>
+                  <span className="block text-[10px] text-slate-400 uppercase font-semibold">
+                    {formatDate(task.ngay_hoan_thanh) !== '--' ? 'Deadline / Hoàn thành' : 'Deadline'}
+                  </span>
+                  <span className="font-mono text-slate-700">
+                    {formatDate(task.ngay_hoan_thanh) !== '--'
+                      ? `${formatDate(task.deadline)} (HT: ${formatDate(task.ngay_hoan_thanh)})`
+                      : formatDate(task.deadline)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <RatingBadge task={task} rating={calculateEvaluation(task)} />
+                <div className="flex items-center gap-2">
+                  <button onClick={() => onOpenDetail(task)} className="btn-secondary h-8 px-2.5 text-xs">Chi tiết</button>
+                  {!isViewOnly && (
+                    <button onClick={() => onOpenEditTask(task)} className="btn-primary h-8 px-2.5 text-xs">Sửa</button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------
+// MODAL: THÊM MỚI CÔNG VIỆC ĐẢNG (NGUỒN NƠI BAN HÀNH TỪ CỘT R SHEET SETTINGS)
+// ----------------------------------------------------------------------
+function AddPartyTaskModal({ categories, defaultDepartment = '', onClose, onSubmit }) {
+  // Nguồn dữ liệu Nơi ban hành lấy trực tiếp từ Cột R của sheet Settings (categories.partyAgencies)
+  const partyAgencyList = useMemo(() => {
+    const colRList = (categories?.partyAgencies && Array.isArray(categories.partyAgencies))
+      ? categories.partyAgencies.map(a => String(a || '').trim()).filter(Boolean)
+      : [];
+    if (colRList.length > 0) {
+      return Array.from(new Set(colRList));
+    }
+    return [
+      'Tỉnh ủy An Giang',
+      'Huyện ủy Châu Phú',
+      'Đảng ủy xã Định Mỹ',
+      'Ban Tổ chức Tỉnh ủy',
+      'Ủy ban Kiểm tra Tỉnh ủy',
+      'Ban Tuyên giáo Tỉnh ủy',
+      'Ban Dân vận Tỉnh ủy'
+    ];
+  }, [categories]);
+
+  const departmentList = useMemo(() => {
+    let list = [];
+    if (categories?.departments && Array.isArray(categories.departments) && categories.departments.length > 0) {
+      list = categories.departments;
+    } else {
+      list = window.INITIAL_CATEGORIES?.departments || ['Văn phòng Đảng ủy', 'Ban Xây dựng Đảng', 'Ủy ban Kiểm tra Đảng ủy', 'Khối Dân vận', 'Kinh tế', 'VH - XH', 'Văn phòng UBND'];
+    }
+    return list.map(d => String(d || '').trim()).filter(Boolean);
+  }, [categories]);
+
+  const [formData, setFormData] = useState(() => {
+    const initialDept = (defaultDepartment && defaultDepartment !== 'ALL') ? defaultDepartment : (departmentList[0] || 'Kinh tế');
+    return {
+      noi_ban_hanh: partyAgencyList[0] || '',
+      so_cong_van: '',
+      ten_cong_viec: '',
+      mo_ta: '',
+      phong_ban: initialDept,
+      don_vi_phoi_hop: '',
+      ngay_tao: formatDate(new Date()),
+      deadline: '',
+      ket_qua: '',
+      ghi_chu: ''
+    };
+  });
+
+  useEffect(() => {
+    if (!formData.noi_ban_hanh && partyAgencyList.length > 0) {
+      setFormData(prev => ({ ...prev, noi_ban_hanh: partyAgencyList[0] }));
+    }
+  }, [partyAgencyList]);
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.ten_cong_viec || !formData.so_cong_van) {
+      alert('Vui lòng điền đầy đủ Số công văn và Tên công việc!');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await onSubmit(formData);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop">
+      <div className="modal-content max-w-2xl max-h-[90vh] flex flex-col">
+        <div className="modal-header">
+          <div>
+            <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+              <i data-lucide="flag" className="w-4 h-4 text-rose-600"></i>
+              <span>Thêm mới Công việc Đảng</span>
+            </h3>
+            <span className="text-xs font-medium text-slate-500 mt-0.5 block">Lưu trữ trực tiếp vào Sheet Taks_Dang (Cột A - P)</span>
+          </div>
+          <button onClick={onClose} disabled={isSubmitting} className="p-1 rounded-lg text-slate-400 hover:bg-slate-100">
+            <i data-lucide="x" className="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
+          <div className="modal-body space-y-4 max-h-[70vh] overflow-y-auto p-4 md:p-6">
+            {/* Grid 1: Nơi ban hành (Cột R sheet Settings) & Số công văn */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Nơi ban hành *</label>
+                <SearchableSelect
+                  options={partyAgencyList}
+                  value={formData.noi_ban_hanh}
+                  onChange={val => setFormData({ ...formData, noi_ban_hanh: val })}
+                  placeholder="Chọn hoặc tìm Nơi ban hành (Cột R Settings)..."
+                  required={true}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Số Công văn *</label>
+                <input
+                  type="text"
+                  placeholder="Ví dụ: 15-CV/ĐU"
+                  value={formData.so_cong_van}
+                  onChange={e => setFormData({ ...formData, so_cong_van: e.target.value })}
+                  className="form-input"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Block 2: Tên công việc / Trích yếu */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Tên công việc *</label>
+              <textarea
+                rows={3}
+                placeholder="Nhập tên công việc hoặc nội dung trích yếu văn bản Đảng..."
+                value={formData.ten_cong_viec}
+                onChange={e => setFormData({ ...formData, ten_cong_viec: e.target.value })}
+                className="form-input h-auto py-2"
+                required
+              ></textarea>
+            </div>
+
+            {/* Block 3: Mô tả nội dung */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Mô tả</label>
+              <input
+                type="text"
+                placeholder="Mô tả chi tiết nội dung nhiệm vụ..."
+                value={formData.mo_ta}
+                onChange={e => setFormData({ ...formData, mo_ta: e.target.value })}
+                className="form-input"
+              />
+            </div>
+
+            {/* Grid 2: Phòng ban (hoặc Ban Đảng chủ trì) & Đơn vị phối hợp */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Phòng ban / Ban Đảng chủ trì *</label>
+                <select
+                  value={formData.phong_ban}
+                  onChange={e => setFormData({ ...formData, phong_ban: e.target.value })}
+                  className="form-select font-medium text-slate-800"
+                  required
+                >
+                  {departmentList.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Đơn vị phối hợp</label>
+                <input
+                  type="text"
+                  placeholder="Ví dụ: Ban Tuyên giáo, Chi bộ ấp..."
+                  value={formData.don_vi_phoi_hop}
+                  onChange={e => setFormData({ ...formData, don_vi_phoi_hop: e.target.value })}
+                  className="form-input"
+                />
+              </div>
+            </div>
+
+            {/* Grid 3: Ngày tạo & Deadline */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Ngày tạo</label>
+                <DateInput
+                  value={formData.ngay_tao}
+                  onChange={val => setFormData({ ...formData, ngay_tao: val })}
+                  placeholder="dd/mm/yyyy"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Deadline</label>
+                <DateInput
+                  value={formData.deadline}
+                  onChange={val => setFormData({ ...formData, deadline: val })}
+                  placeholder="dd/mm/yyyy"
+                />
+              </div>
+            </div>
+
+            {/* Block 4: Kết quả (Sản phẩm, Văn bản ban hành) */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Kết quả (Sản phẩm, Văn bản ban hành)</label>
+              <textarea
+                rows={2}
+                placeholder="Nhập sản phẩm hoặc văn bản ban hành..."
+                value={formData.ket_qua}
+                onChange={e => setFormData({ ...formData, ket_qua: e.target.value })}
+                className="form-input h-auto py-2"
+              ></textarea>
+            </div>
+
+            {/* Block 5: Ghi chú */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Ghi chú</label>
+              <input
+                type="text"
+                placeholder="Ghi chú thêm (nếu có)..."
+                value={formData.ghi_chu}
+                onChange={e => setFormData({ ...formData, ghi_chu: e.target.value })}
+                className="form-input"
+              />
+            </div>
+          </div>
+
+          <div className="modal-footer">
+            <button type="button" onClick={onClose} disabled={isSubmitting} className="btn-secondary">Hủy</button>
+            <button type="submit" disabled={isSubmitting} className="btn-primary inline-flex items-center gap-1.5 min-w-[140px] justify-center">
+              {isSubmitting ? (
+                <>
+                  <Spinner className="w-4 h-4 text-white" />
+                  <span>Đang lưu...</span>
+                </>
+              ) : (
+                <>
+                  <i data-lucide="check" className="w-4 h-4"></i>
+                  <span>Lưu công việc</span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------
+// MODAL: CHỈNH SỬA CÔNG VIỆC ĐẢNG (NGUỒN NƠI BAN HÀNH TỪ CỘT R SHEET SETTINGS)
+// ----------------------------------------------------------------------
+function EditPartyTaskModal({ task, categories, onClose, onSubmit }) {
+  // Nguồn dữ liệu Nơi ban hành lấy trực tiếp từ Cột R của sheet Settings (categories.partyAgencies)
+  const partyAgencyList = useMemo(() => {
+    const colRList = (categories?.partyAgencies && Array.isArray(categories.partyAgencies))
+      ? categories.partyAgencies.map(a => String(a || '').trim()).filter(Boolean)
+      : [];
+    const defaults = colRList.length > 0 ? colRList : [
+      'Tỉnh ủy An Giang',
+      'Huyện ủy Châu Phú',
+      'Đảng ủy xã Định Mỹ',
+      'Ban Tổ chức Tỉnh ủy',
+      'Ủy ban Kiểm tra Tỉnh ủy',
+      'Ban Tuyên giáo Tỉnh ủy',
+      'Ban Dân vận Tỉnh ủy'
+    ];
+    const set = new Set(defaults);
+    if (task.noi_ban_hanh && task.noi_ban_hanh.trim() !== '') {
+      set.add(task.noi_ban_hanh.trim());
+    }
+    return Array.from(set);
+  }, [categories, task]);
+
+  const departmentList = useMemo(() => {
+    let catDepts = (categories?.departments && Array.isArray(categories.departments) && categories.departments.length > 0)
+      ? categories.departments
+      : (window.INITIAL_CATEGORIES?.departments || ['Văn phòng Đảng ủy', 'Ban Xây dựng Đảng', 'Ủy ban Kiểm tra Đảng ủy', 'Khối Dân vận', 'Kinh tế', 'VH - XH', 'Văn phòng UBND']);
+    const set = new Set(catDepts.map(d => String(d || '').trim()).filter(Boolean));
+    if (task.phong_ban && task.phong_ban.trim() !== '') {
+      set.add(task.phong_ban.trim());
+    }
+    return Array.from(set);
+  }, [categories, task]);
+
+  const [formData, setFormData] = useState({
+    id: task.id,
+    ma_cv: task.ma_cv || String(task.id || ''),
+    excel_row: task.excel_row || null,
+    noi_ban_hanh: task.noi_ban_hanh || partyAgencyList[0] || '',
+    so_cong_van: task.so_cong_van || '',
+    ten_cong_viec: task.ten_cong_viec || '',
+    mo_ta: task.mo_ta || '',
+    phong_ban: task.phong_ban || departmentList[0] || 'Kinh tế',
+    don_vi_phoi_hop: task.don_vi_phoi_hop || '',
+    ngay_tao: formatDate(task.ngay_tao) !== '--' ? formatDate(task.ngay_tao) : (task.ngay_tao || ''),
+    deadline: formatDate(task.deadline) !== '--' ? formatDate(task.deadline) : (task.deadline || ''),
+    ngay_hoan_thanh: formatDate(task.ngay_hoan_thanh) !== '--' ? formatDate(task.ngay_hoan_thanh) : (task.ngay_hoan_thanh || ''),
+    trang_thai: task.trang_thai || 'Đang thực hiện',
+    ket_qua: task.ket_qua || '',
+    ghi_chu: task.ghi_chu || '',
+    danh_gia: task.danh_gia || ''
+  });
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.ten_cong_viec || !formData.so_cong_van) {
+      alert('Vui lòng điền đầy đủ Số công văn và Tên công việc!');
+      return;
+    }
+    if (formData.trang_thai === 'Hoàn thành') {
+      if (!formData.ngay_hoan_thanh || !formData.ngay_hoan_thanh.trim()) {
+        alert('Khi chọn trạng thái "Hoàn thành", vui lòng nhập Ngày hoàn thành thực tế!');
+        return;
+      }
+      if (!formData.ket_qua || !formData.ket_qua.trim()) {
+        alert('Khi chọn trạng thái "Hoàn thành", vui lòng nhập Kết quả (Sản phẩm, Văn bản ban hành)!');
+        return;
+      }
+    }
+    setIsSubmitting(true);
+    try {
+      await onSubmit(formData);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop">
+      <div className="modal-content max-w-2xl max-h-[90vh] flex flex-col">
+        <div className="modal-header">
+          <div>
+            <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+              <i data-lucide="flag" className="w-4 h-4 text-rose-600"></i>
+              <span>Chỉnh sửa Công việc Đảng</span>
+            </h3>
+            <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded mt-1 inline-block">
+              Mã CV #{task.ma_cv || task.id} - {task.so_cong_van || 'Chưa có số CV'}
+            </span>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:bg-slate-100">
+            <i data-lucide="x" className="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
+          <div className="modal-body space-y-4 max-h-[70vh] overflow-y-auto p-4 md:p-6">
+            {/* Grid 1: Nơi ban hành (Cột R sheet Settings) & Số công văn */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Nơi ban hành *</label>
+                <SearchableSelect
+                  options={partyAgencyList}
+                  value={formData.noi_ban_hanh}
+                  onChange={val => setFormData({ ...formData, noi_ban_hanh: val })}
+                  placeholder="Chọn hoặc tìm Nơi ban hành (Cột R Settings)..."
+                  required={true}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Số Công văn *</label>
+                <input
+                  type="text"
+                  placeholder="Ví dụ: 15-CV/ĐU"
+                  value={formData.so_cong_van}
+                  onChange={e => setFormData({ ...formData, so_cong_van: e.target.value })}
+                  className="form-input"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Block 2: Tên công việc */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Tên công việc *</label>
+              <textarea
+                rows={3}
+                placeholder="Nhập tên công việc hoặc nội dung trích yếu..."
+                value={formData.ten_cong_viec}
+                onChange={e => setFormData({ ...formData, ten_cong_viec: e.target.value })}
+                className="form-input h-auto py-2"
+                required
+              ></textarea>
+            </div>
+
+            {/* Block 3: Mô tả */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Mô tả</label>
+              <input
+                type="text"
+                placeholder="Mô tả tóm tắt nội dung nhiệm vụ..."
+                value={formData.mo_ta}
+                onChange={e => setFormData({ ...formData, mo_ta: e.target.value })}
+                className="form-input"
+              />
+            </div>
+
+            {/* Grid 2: Phòng ban & Đơn vị phối hợp */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Phòng ban / Ban Đảng chủ trì *</label>
+                <select
+                  value={formData.phong_ban}
+                  onChange={e => setFormData({ ...formData, phong_ban: e.target.value })}
+                  className="form-select font-medium text-slate-800"
+                  required
+                >
+                  {departmentList.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Đơn vị phối hợp</label>
+                <input
+                  type="text"
+                  placeholder="Ví dụ: Ban Tuyên giáo, Chi bộ ấp..."
+                  value={formData.don_vi_phoi_hop}
+                  onChange={e => setFormData({ ...formData, don_vi_phoi_hop: e.target.value })}
+                  className="form-input"
+                />
+              </div>
+            </div>
+
+            {/* Grid 3: Ngày tạo & Deadline */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Ngày tạo</label>
+                <DateInput
+                  value={formData.ngay_tao}
+                  onChange={val => setFormData({ ...formData, ngay_tao: val })}
+                  placeholder="dd/mm/yyyy"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Deadline</label>
+                <DateInput
+                  value={formData.deadline}
+                  onChange={val => setFormData({ ...formData, deadline: val })}
+                  placeholder="dd/mm/yyyy"
+                />
+              </div>
+            </div>
+
+            {/* Grid 4: Trạng thái & Ngày hoàn thành */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Trạng thái *</label>
+                <select
+                  value={formData.trang_thai}
+                  onChange={e => setFormData({ ...formData, trang_thai: e.target.value })}
+                  className="form-select"
+                >
+                  <option value="Đang thực hiện">Đang thực hiện</option>
+                  <option value="Hoàn thành">Hoàn thành</option>
+                  <option value="Quá hạn">Quá hạn</option>
+                  <option value="Tạm dừng">Tạm dừng</option>
+                  <option value="Hủy">Hủy</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Ngày hoàn thành {formData.trang_thai === 'Hoàn thành' ? '*' : ''}
+                </label>
+                <DateInput
+                  value={formData.ngay_hoan_thanh}
+                  onChange={val => setFormData({ ...formData, ngay_hoan_thanh: val })}
+                  placeholder="dd/mm/yyyy"
+                />
+              </div>
+            </div>
+
+            {/* Block 5: Kết quả (Sản phẩm, Văn bản ban hành) */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Kết quả (Sản phẩm, Văn bản ban hành) {formData.trang_thai === 'Hoàn thành' ? '*' : ''}
+              </label>
+              <textarea
+                rows={2}
+                placeholder="Ví dụ: Báo cáo số 12-BC/ĐU..."
+                value={formData.ket_qua}
+                onChange={e => setFormData({ ...formData, ket_qua: e.target.value })}
+                className="form-input h-auto py-2"
+              ></textarea>
+            </div>
+
+            {/* Block 6: Ghi chú */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Ghi chú</label>
+              <input
+                type="text"
+                placeholder="Ghi chú thêm (nếu có)..."
+                value={formData.ghi_chu}
+                onChange={e => setFormData({ ...formData, ghi_chu: e.target.value })}
+                className="form-input"
+              />
+            </div>
+          </div>
+
+          <div className="modal-footer">
+            <button type="button" onClick={onClose} disabled={isSubmitting} className="btn-secondary">Hủy</button>
+            <button type="submit" disabled={isSubmitting} className="btn-primary inline-flex items-center gap-1.5 min-w-[150px] justify-center">
+              {isSubmitting ? (
+                <>
+                  <Spinner className="w-4 h-4 text-white" />
+                  <span>Đang lưu thay đổi...</span>
+                </>
+              ) : (
+                <>
+                  <i data-lucide="check" className="w-4 h-4"></i>
+                  <span>Lưu thay đổi</span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------
+// MODAL: CHI TIẾT CÔNG VIỆC ĐẢNG
+// ----------------------------------------------------------------------
+function PartyTaskDetailModal({ task, isViewOnly, onClose, onOpenEditTask, onOpenPrintSubmission }) {
+  return (
+    <div className="modal-backdrop">
+      <div className="modal-content max-w-2xl">
+        <div className="modal-header">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                Mã CV #{task.ma_cv || task.id}
+              </span>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                isTaskOverdue(task) ? 'text-rose-600 bg-rose-50 border border-rose-200' : 'text-blue-600 bg-blue-50'
+              }`}>{task.so_cong_van}</span>
+            </div>
+            <h3 className="font-bold text-slate-900 text-base mt-1">{task.ten_cong_viec}</h3>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:bg-slate-100">
+            <i data-lucide="x" className="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <div className="modal-body space-y-5">
+          {/* Metadata Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200/60 text-xs">
+            <div>
+              <span className="block text-slate-400 uppercase font-semibold">Nơi ban hành</span>
+              <span className="font-semibold text-slate-800">{task.noi_ban_hanh || '--'}</span>
+            </div>
+            <div>
+              <span className="block text-slate-400 uppercase font-semibold">Phòng ban / Ban Đảng</span>
+              <span className="font-bold text-blue-700">{task.phong_ban || '--'}</span>
+            </div>
+            <div>
+              <span className="block text-slate-400 uppercase font-semibold">Đơn vị phối hợp</span>
+              <span className="font-medium text-slate-800">{task.don_vi_phoi_hop || '--'}</span>
+            </div>
+            <div>
+              <span className="block text-slate-400 uppercase font-semibold">Trạng thái</span>
+              <StatusBadge status={task.trang_thai} />
+            </div>
+            <div>
+              <span className="block text-slate-400 uppercase font-semibold">Đánh giá</span>
+              <RatingBadge task={task} rating={calculateEvaluation(task)} />
+            </div>
+            <div>
+              <span className="block text-slate-400 uppercase font-semibold">Ngày tạo</span>
+              <span className="font-mono text-slate-700">{formatDate(task.ngay_tao)}</span>
+            </div>
+            <div>
+              <span className="block text-slate-400 uppercase font-semibold">Deadline</span>
+              <span className="font-mono text-slate-700">{formatDate(task.deadline)}</span>
+            </div>
+            <div>
+              <span className="block text-slate-400 uppercase font-semibold">Ngày hoàn thành</span>
+              <span className="font-mono text-slate-700">{formatDate(task.ngay_hoan_thanh)}</span>
+            </div>
+            <div>
+              <span className="block text-slate-400 uppercase font-semibold">Còn lại / Trễ</span>
+              <span className="font-mono text-slate-700">
+                {task.so_ngay_tre ? `Trễ ${task.so_ngay_tre} ngày` : (task.so_ngay_con_lai ? `Còn ${task.so_ngay_con_lai} ngày` : '--')}
+              </span>
+            </div>
+          </div>
+
+          {task.mo_ta && (
+            <div>
+              <h4 className="text-xs font-bold text-slate-700 uppercase mb-1.5">Mô tả nội dung</h4>
+              <p className="text-sm text-slate-600 bg-white p-3 rounded-xl border border-slate-200">{task.mo_ta}</p>
+            </div>
+          )}
+
+          {task.ket_qua && (
+            <div>
+              <h4 className="text-xs font-bold text-slate-700 uppercase mb-1.5">Kết quả (Sản phẩm, Văn bản ban hành)</h4>
+              <p className="text-sm text-emerald-800 bg-emerald-50/70 p-3 rounded-xl border border-emerald-200">{task.ket_qua}</p>
+            </div>
+          )}
+
+          {task.ghi_chu && (
+            <div>
+              <h4 className="text-xs font-bold text-slate-700 uppercase mb-1.5">Ghi chú</h4>
+              <p className="text-sm text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200">{task.ghi_chu}</p>
+            </div>
+          )}
+        </div>
+
+        <div className="modal-footer flex items-center justify-between">
+          {onOpenPrintSubmission && (
+            <button
+              type="button"
+              onClick={() => onOpenPrintSubmission(task)}
+              className="btn-secondary text-xs text-blue-700 border-blue-200 bg-blue-50/80 hover:bg-blue-100 font-semibold inline-flex items-center gap-1.5 shadow-2xs"
+            >
+              <i data-lucide="file-text" className="w-4 h-4"></i> In phiếu trình
+            </button>
+          )}
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={onClose} className="btn-secondary text-xs">
+              Đóng
+            </button>
+            {!isViewOnly && (
+              <button type="button" onClick={() => onOpenEditTask(task)} className="btn-primary text-xs">
+                <i data-lucide="edit-3" className="w-4 h-4"></i> Chỉnh sửa thông tin
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

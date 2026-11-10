@@ -1,7 +1,21 @@
 // Dynamic dependency lookup for qlcv_deps local folder
-if (require('module').globalPaths && require('fs').existsSync('C:/Users/buith/AppData/Local/Temp/qlcv_deps/node_modules')) {
-  require('module').globalPaths.push('C:/Users/buith/AppData/Local/Temp/qlcv_deps/node_modules');
-  module.paths.push('C:/Users/buith/AppData/Local/Temp/qlcv_deps/node_modules');
+const os = require('os');
+const path = require('path');
+const fs = require('fs');
+
+const depPaths = [
+  path.join(os.tmpdir(), 'qlcv_deps', 'node_modules'),
+  'C:/Users/buith/AppData/Local/Temp/qlcv_deps/node_modules'
+];
+for (const p of depPaths) {
+  if (fs.existsSync(p)) {
+    if (require('module').globalPaths && !require('module').globalPaths.includes(p)) {
+      require('module').globalPaths.push(p);
+    }
+    if (!module.paths.includes(p)) {
+      module.paths.unshift(p);
+    }
+  }
 }
 
 require('dotenv').config();
